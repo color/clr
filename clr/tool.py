@@ -64,7 +64,7 @@ def print_help_for_cmd(cmd_, prefix=''):
 
     is_default = lambda (a, s): s is intern('default')
     req = [spec_item for spec_item in spec if is_default(spec_item)]
-    noreq = [spec_item for spec_item in spec if not is_default(spec_item)]
+    notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
 
     args = []
     if len(req) > 0:
