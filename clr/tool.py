@@ -50,7 +50,7 @@ import textwrap
 import types
 
 import clr
-import clr.config
+from clr.config import CONFIG
 
 
 def print_help_for_cmd(cmd_, prefix=''):
@@ -123,7 +123,7 @@ class System(object):
             print_help_for_cmd(which)
 
 def get_commands():
-    cmds = dict((ns, get_command(ns)) for ns in clr.config['commands'].keys())
+    cmds = dict((ns, get_command(ns)) for ns in CONFIG['commands'].keys())
     cmds['system'] = System()
 
     return cmds
@@ -132,7 +132,7 @@ def get_command(which):
     if which == 'system':
         obj = System()
     else:
-        path = path_of_module(clr.config['commands'][which])
+        path = path_of_module(CONFIG['commands'][which])
         d    = {}
         execfile(path, d)
         obj = d['COMMANDS']
@@ -142,9 +142,9 @@ def get_command(which):
 
     return obj
 
-def path_of_module(mod):
+def path_of_module(mod, path=None):
     a, b = peel(mod, '.')
-    _, path, _ = imp.find_module(a, None)
+    _, path, _ = imp.find_module(a, path)
 
     if b:
         return path_of_module(b, [path])
@@ -159,7 +159,7 @@ def peel(string, delimitter):
         return peeled[0], peeled[1]
 
 def get_options():
-    return [__import__(o, {}, {}, ['']).OPTIONS for o in clr.config['options']]
+    return [__import__(o, {}, {}, ['']).OPTIONS for o in CONFIG['options']]
 
 def call(cmd_, *args, **kwargs):
     _, cmd, _, _ = resolve_command(cmd_)

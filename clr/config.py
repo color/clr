@@ -10,5 +10,5 @@ def find_clrfile(name='clrfile.py'):
         path = os.path.join('..', path)
     raise Exception("clrfile.py could not be located.")
 
-config = {}
-execfile(find_clrfile(), config)
+CONFIG = {}
+execfile(find_clrfile(), CONFIG)
