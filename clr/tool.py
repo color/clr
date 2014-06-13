@@ -45,24 +45,13 @@ from copy import deepcopy
 import imp
 import inspect
 import optparse
-import os.path
 import sys
 import textwrap
 import types
 
 import clr
+import clr.config
 
-
-config = {}
-exec(find_clrfile(), config)
-
-def find_clrfile(name='clrfile.py'):
-    path = '.'
-    while os.path.split(os.path.abspath(path))[1]:
-        file_path = os.path.join(path, name)
-        if os.path.exists(file_patn):
-            return os.path.abspath(file_path)
-    raise Exception("clrfile.py could not be located.")
 
 def print_help_for_cmd(cmd_, prefix=''):
     w = textwrap.TextWrapper(
@@ -134,7 +123,7 @@ class System(object):
             print_help_for_cmd(which)
 
 def get_commands():
-    cmds = dict((ns, get_command(ns)) for ns in config['commands'].keys())
+    cmds = dict((ns, get_command(ns)) for ns in clr.config['commands'].keys())
     cmds['system'] = System()
 
     return cmds
@@ -143,7 +132,7 @@ def get_command(which):
     if which == 'system':
         obj = System()
     else:
-        path = path_of_module(config['commands'][which])
+        path = path_of_module(clr.config['commands'][which])
         d    = {}
         execfile(path, d)
         obj = d['COMMANDS']
@@ -170,7 +159,7 @@ def peel(string, delimitter):
         return peeled[0], peeled[1]
 
 def get_options():
-    return [__import__(o, {}, {}, ['']).OPTIONS for o in config['options']]
+    return [__import__(o, {}, {}, ['']).OPTIONS for o in clr.config['options']]
 
 def call(cmd_, *args, **kwargs):
     _, cmd, _, _ = resolve_command(cmd_)

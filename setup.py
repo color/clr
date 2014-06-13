@@ -1,3 +1,5 @@
+import os
+
 from clr import __version__
 
 try:
@@ -16,7 +18,7 @@ setup(name = "clr",
       author = "Color Genomics",
       author_email = "dev@getcolor.com",
       url = "https://github.com/ColorGenomics/clr",
-      entry_opints = {
+      entry_points = {
         'console_scripts': [ 'clr = clr:main' ],
       },
       install_requires = [] + platform_packages,
