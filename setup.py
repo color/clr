@@ -17,7 +17,7 @@ setup(name = "clr",
       author_email = "dev@getcolor.com",
       url = "https://github.com/ColorGenomics/clr",
       entry_opints = {
-        'console_scripts': [ 'clr' = 'clr:main' ],
+        'console_scripts': [ 'clr = clr:main' ],
       },
       install_requires = [] + platform_packages,
       )
