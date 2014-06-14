@@ -9,16 +9,39 @@ A command line tool for executing custom python scripts.
 $ pip install git+https://git+https://github.com/ColorGenomics/clr.git@v0.1.0
 ```
 
+* Create a custom command
+```
+# clr_commands/say.py
+class Commands(object):
+    descr = "say commands"
+    
+    def cmd_hello_world(self):
+        print "hello world!"
+
+COMMANDS = Commands()
+```
+
 * Create clrfile.py in your root directory
 ```
 # clrfile.py
 commands = {
-  'deploy': 'clr_commands.deploy',
-  'vcf':    'clr_commands.vcf',
+  'say': 'clr_commands.say',
 }
 ```
 
 * Run your command
 ```
-$ clr deploy:release web_server
+$ clr say:hello_world
+> hello world!
+```
+
+## Useful commands
+* Get available namespaces
+```
+$ clr help
+```
+
+* Get available commands in a namespace
+```
+$ clr help namespace
 ```
