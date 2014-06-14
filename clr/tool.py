@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 from collections import defaultdict
 from copy import deepcopy
-import imp
 import inspect
 import optparse
 import sys
@@ -11,6 +10,7 @@ import types
 
 import clr
 from clr.config import CONFIG
+from clr.util import path_of_module
 
 
 def print_help_for_cmd(cmd_, prefix=''):
@@ -102,28 +102,8 @@ def get_command(which):
 
     return obj
 
-def path_of_module(mod, path=None):
-    a, b = peel(mod, '.')
-    _, path, _ = imp.find_module(a, path)
-
-    if b:
-        return path_of_module(b, [path])
-    else:
-        return path
-
-def peel(string, delimitter):
-    peeled = string.split(delimitter, 1)
-    if len(peeled) == 1:
-        return peeled[0], ''
-    else:
-        return peeled[0], peeled[1]
-
 def get_options():
     return [__import__(o, {}, {}, ['']).OPTIONS for o in CONFIG['options']]
-
-def call(cmd_, *args, **kwargs):
-    _, cmd, _, _ = resolve_command(cmd_)
-    cmd(*args, **kwargs)
 
 def resolve_command(cmd_):
     """Resolve the string `cmd_' into a (object, method) tuple."""
@@ -175,7 +155,8 @@ def handle_global_options(opts):
 
     return hooks
 
-def main(argv):
+def main():
+    argv = sys.argv
     parser = optparse.OptionParser(add_help_option=False)
     add_global_options(parser)
     ghelp = parser.format_option_help()
@@ -261,6 +242,3 @@ def main(argv):
     )
 
     run(cmd, args, kwargs)
-
-if __name__ == '__main__':
-    main(sys.argv)
