@@ -18,4 +18,5 @@ setup(name = "clr",
       entry_points = {
         "console_scripts": [ "clr = clr:main" ],
       },
+      license = "MIT",
       )
