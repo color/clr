@@ -8,7 +8,7 @@ def find_clrfile(name='clrfile.py'):
         if os.path.exists(file_path):
             return os.path.abspath(file_path)
         path = os.path.join('..', path)
-    raise Exception("clrfile.py could not be located.")
+    raise Exception("%s could not be located." % name)
 
 def commands():
     config = _get_config()
