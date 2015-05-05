@@ -2,3 +2,5 @@
 **/*.pyc
 *.swp
 build
+
+clr.egg-info
