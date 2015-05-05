@@ -69,6 +69,14 @@ def get_command(which):
 
     return obj
 
+def get_subcommands(ns):
+    obj = get_command(ns)
+    return {attr[4:]: getattr(obj, attr) for attr in dir(obj)
+            if attr.startswith('cmd_')}
+
+def get_subcommand(ns, name):
+    return get_subcommands(ns).get(name)
+
 def resolve_command(cmd_):
     """Resolve the string `cmd_' into a (object, method) tuple."""
     try:
