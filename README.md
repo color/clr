@@ -11,7 +11,7 @@ $ pip install git+https://github.com/ColorGenomics/clr.git@v0.1.2
 
 * Create a custom command
 ```
-# clr_commands/say.py
+# color/src/clr_commands/say.py
 class Commands(object):
     descr = "say commands"
     
@@ -23,7 +23,7 @@ COMMANDS = Commands()
 
 * Create clrfile.py in your root directory
 ```
-# clrfile.py
+# color/clrfile.py
 commands = {
   'say': 'clr_commands.say',
 }
