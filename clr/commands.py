@@ -2,6 +2,7 @@ from __future__ import print_function
 from past.builtins import execfile
 from builtins import zip
 from builtins import object
+from builtins import intern
 import inspect
 import sys
 import textwrap
@@ -20,7 +21,7 @@ def print_help_for_cmd(cmd_, prefix=''):
 
     spec, vararg = get_command_spec(cmd)
 
-    is_default = lambda a_s: a_s[1] is sys.intern('default')
+    is_default = lambda a_s: a_s[1] is intern('default')
     req = [spec_item for spec_item in spec if is_default(spec_item)]
     notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
 
@@ -114,7 +115,7 @@ def get_command_spec(cmd):
         args = args[1:]
 
     nargs = len(args) - len(defvals)
-    args = list(zip(args[:nargs], [sys.intern('default')]*nargs)) + list(zip(args[nargs:], defvals))
+    args = list(zip(args[:nargs], [intern('default')]*nargs)) + list(zip(args[nargs:], defvals))
 
     return args, vararg
 
