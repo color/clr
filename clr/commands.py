@@ -2,7 +2,7 @@ from __future__ import print_function
 from past.builtins import execfile
 from builtins import zip
 from builtins import object
-from builtins import intern
+from past.builtins import intern
 import inspect
 import sys
 import textwrap
