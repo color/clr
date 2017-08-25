@@ -6,7 +6,7 @@ A command line tool for executing custom python scripts.
 
 * Install clr
 ```
-$ pip install git+https://github.com/color/clr.git@v0.1.6
+$ pip install git+https://github.com/color/clr.git@v0.1.7
 ```
 
 * Create a custom command
