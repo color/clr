@@ -1,7 +1,5 @@
 import os
 
-from clr import __version__
-
 try:
   from setuptools import setup
 except:
@@ -9,7 +7,7 @@ except:
 
 
 setup(name = "clr",
-      version = __version__,
+      version = "0.1.6",
       description = "A command line tool for executing custom python scripts.",
       author = "Color Genomics",
       author_email = "dev@getcolor.com",
