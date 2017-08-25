@@ -1,3 +1,7 @@
+from __future__ import print_function
+from past.builtins import execfile
+from builtins import zip
+from builtins import object
 import inspect
 import sys
 import textwrap
@@ -16,7 +20,7 @@ def print_help_for_cmd(cmd_, prefix=''):
 
     spec, vararg = get_command_spec(cmd)
 
-    is_default = lambda (a, s): s is intern('default')
+    is_default = lambda a_s: a_s[1] is sys.intern('default')
     req = [spec_item for spec_item in spec if is_default(spec_item)]
     notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
 
@@ -26,7 +30,7 @@ def print_help_for_cmd(cmd_, prefix=''):
 
     if len(notreq) > 0:
         def atxt(a, v):
-            if isinstance(v, types.BooleanType):
+            if isinstance(v, bool):
                 if v:
                     return '--no%s' % a
                 else:
@@ -40,17 +44,17 @@ def print_help_for_cmd(cmd_, prefix=''):
     if vararg is not None:
         args.append('[%s...]' % vararg)
 
-    print w.fill('%s %s' % (cmd_, ' '.join(args)))
+    print(w.fill('%s %s' % (cmd_, ' '.join(args))))
 
     w.initial_indent += '  '
     w.subsequent_indent += '  '
 
     doc = inspect.getdoc(cmd)
     for l in doc.split('\n'):
-        print w.fill(l)
+        print(w.fill(l))
 
 def get_commands():
-    cmds = dict((ns, get_command(ns)) for ns in clr.config.commands().keys())
+    cmds = dict((ns, get_command(ns)) for ns in list(clr.config.commands().keys()))
     cmds['system'] = System()
 
     return cmds
@@ -90,7 +94,7 @@ def resolve_command(cmd_):
 
         return obj, cmd, ns, cmd_
     except (KeyError, AttributeError):
-        print >>sys.stderr, 'Error! command %s does not exist' % cmd_
+        print('Error! command %s does not exist' % cmd_, file=sys.stderr)
         sys.exit(1)
 
 def get_command_spec(cmd):
@@ -110,7 +114,7 @@ def get_command_spec(cmd):
         args = args[1:]
 
     nargs = len(args) - len(defvals)
-    args = zip(args[:nargs], [intern('default')]*nargs) + zip(args[nargs:], defvals)
+    args = list(zip(args[:nargs], [sys.intern('default')]*nargs)) + list(zip(args[nargs:], defvals))
 
     return args, vararg
 
@@ -124,16 +128,16 @@ class System(object):
         either a namespace or a namespace:command tuple.
         """
         if which is None:
-            print 'Available namespaces'
-            for obj in get_commands().values():
-                print ' ', obj.ns.ljust(20), '-', obj.descr
+            print('Available namespaces')
+            for obj in list(get_commands().values()):
+                print(' ', obj.ns.ljust(20), '-', obj.descr)
         elif which.find(':') < 0:
             if which in get_commands():
                 obj = get_commands()[which]
 
-                print which, '-', obj.descr
+                print(which, '-', obj.descr)
 
-                for k in filter(lambda k: k.startswith('cmd_'), dir(obj)):
+                for k in [k for k in dir(obj) if k.startswith('cmd_')]:
                     cmd = '%s:%s' % (which, k[4:])
                     print_help_for_cmd(cmd, prefix='  ')
             else:

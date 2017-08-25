@@ -14,7 +14,7 @@ def handle_global_options(opts):
     hooks = defaultdict(lambda: [])
 
     for o in get_options():
-        for hook, fun in (o.handle_options(opts) or {}).iteritems():
+        for hook, fun in (o.handle_options(opts) or {}).items():
             hooks[hook].append(fun)
 
     return hooks
