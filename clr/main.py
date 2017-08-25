@@ -13,8 +13,7 @@ from clr.options import add_global_options, handle_global_options
 from functools import reduce
 
 def apply(fn, args, kwargs):
-    fn(args, kwargs)
-
+    fn(*args, **kwargs)
 
 def main():
     argv = sys.argv
