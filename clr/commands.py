@@ -1,5 +1,5 @@
 from __future__ import print_function
-from past.builtins import execfile
+from importlib import import_module
 from builtins import zip
 from builtins import object
 from past.builtins import intern
@@ -64,10 +64,9 @@ def get_command(which):
     if which == 'system':
         obj = System()
     else:
-        path = path_of_module(clr.config.commands()[which])
-        d    = {}
-        execfile(path, d)
-        obj = d['COMMANDS']
+        mod_path = clr.config.commands()[which]
+        x = import_module(mod_path)
+        obj = x.COMMANDS
 
     # Backfill namespace.
     obj.ns = which

@@ -6,7 +6,7 @@ A command line tool for executing custom python scripts.
 
 * Install clr
 ```
-$ pip install git+https://github.com/color/clr.git@v0.1.7
+$ pip install git+https://github.com/color/clr.git@v0.1.8
 ```
 
 * Create a custom command
@@ -14,7 +14,7 @@ $ pip install git+https://github.com/color/clr.git@v0.1.7
 # color/src/clr_commands/say.py
 class Commands(object):
     descr = "say commands"
-    
+
     def cmd_hello_world(self):
         print "hello world!"
 
