@@ -7,7 +7,7 @@ except:
 
 
 setup(name = "clr",
-      version = "0.1.8",
+      version = "0.1.9",
       description = "A command line tool for executing custom python scripts.",
       author = "Color Genomics",
       author_email = "dev@getcolor.com",
