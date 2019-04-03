@@ -51,8 +51,9 @@ def print_help_for_cmd(cmd_, prefix=''):
     w.subsequent_indent += '  '
 
     doc = inspect.getdoc(cmd)
-    for l in doc.split('\n'):
-        print(w.fill(l))
+    if doc is not None:
+        for l in doc.split('\n'):
+            print(w.fill(l))
 
 def get_commands():
     cmds = dict((ns, get_command(ns)) for ns in list(clr.config.commands().keys()))
