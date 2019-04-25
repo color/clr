@@ -17,7 +17,7 @@ setup(name = "clr",
         "console_scripts": [ "clr = clr:main" ],
       },
       install_requires=[
-        "future==0.16.0",
+        "future>=0.16.0",
       ],
       license = "MIT",
       )
