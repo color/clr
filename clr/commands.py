@@ -7,10 +7,13 @@ import inspect
 import sys
 import textwrap
 import types
+import difflib
 
 import clr.config
 from clr.util import path_of_module
 
+# Load lazily
+__namespaces = {}
 
 def print_help_for_cmd(cmd_, prefix=''):
     w = textwrap.TextWrapper(
@@ -55,48 +58,64 @@ def print_help_for_cmd(cmd_, prefix=''):
         for l in doc.split('\n'):
             print(w.fill(l))
 
-def get_commands():
-    cmds = dict((ns, get_command(ns)) for ns in list(clr.config.commands().keys()))
-    cmds['system'] = System()
+NAMESPACE_KEYS = clr.config.commands().keys() | {'system'}
 
-    return cmds
+def get_namespaces():
+    # Fill namespace cache
+    for namespace in NAMESPACE_KEYS: get_namespace(namespace)
+    return __namespaces
 
-def get_command(which):
-    if which == 'system':
+def has_namespace(namespace):
+    return namespace in NAMESPACE_KEYS
+
+def load_namespace(namespace):
+    if namespace == 'system':
         obj = System()
     else:
-        mod_path = clr.config.commands()[which]
+        mod_path = clr.config.commands()[namespace]
         x = import_module(mod_path)
         obj = x.COMMANDS
 
     # Backfill namespace.
-    obj.ns = which
-
+    obj.ns = obj.namespace = namespace
     return obj
 
-def get_subcommands(ns):
-    obj = get_command(ns)
+def get_namespace(namespace):
+    global __namespaces
+    if namespace not in __namespaces:
+        __namespaces[namespace] = load_namespace(namespace)
+    return __namespaces[namespace]
+
+def get_subcommands(namespace):
+    obj = get_namespaces(namespace)
     return {attr[4:]: getattr(obj, attr) for attr in dir(obj)
             if attr.startswith('cmd_')}
 
-def get_subcommand(ns, name):
-    return get_subcommands(ns).get(name)
+def get_subcommand(namespace, name):
+    return get_subcommands(namespace).get(name)
 
-def resolve_command(cmd_):
+def resolve_command(query):
     """Resolve the string `cmd_' into a (object, method) tuple."""
-    try:
-        if cmd_.find(':') < 0:
-            cmd_ = 'system:%s' % cmd_
+    if ':' not in query: query = f'system:{query}'
 
-        ns, cmd_ = cmd_.split(':', 1)
+    namespace_key, cmd_name = query.split(':', 1)
+    method_name = f'cmd_{cmd_name}'
 
-        obj = get_command(ns)
-        cmd = getattr(obj, 'cmd_%s' % cmd_)
-
-        return obj, cmd, ns, cmd_
-    except (KeyError, AttributeError):
-        print('Error! command %s does not exist' % cmd_, file=sys.stderr)
+    if not has_namespace(namespace_key):
+        close_matches = difflib.get_close_matches(namespace_key, NAMESPACE_KEYS, cutoff=.4)
+        print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: {close_matches}\n\nAvaliable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
         sys.exit(1)
+
+    namespace = get_namespace(namespace_key)
+
+    if not hasattr(namespace, method_name):
+        cmds = sorted(_[4:] for _ in dir(namespace) if _.startswith('cmd_'))
+        close_matches = difflib.get_close_matches(cmd_name, cmds, cutoff=.4)
+        print(f"Error! Command '{cmd_name}'' does not exist in '{namespace_key}'.\nClosest matches: {close_matches}\n\nAvaliable commands: {cmds}", file=sys.stderr)
+        sys.exit(1)
+
+    cmd = getattr(namespace, method_name)
+    return namespace, cmd, namespace_key, cmd_name
 
 def get_command_spec(cmd):
     """Get a command spec from the given (resolved) command, and
@@ -120,7 +139,7 @@ def get_command_spec(cmd):
     return args, vararg
 
 class System(object):
-    ns = 'system'
+    namespace = 'system'
     descr = 'system commands'
 
     def cmd_help(self, which=None):
@@ -131,7 +150,7 @@ class System(object):
         if which is None:
             print('Available namespaces')
             for obj in list(get_commands().values()):
-                print(' ', obj.ns.ljust(20), '-', obj.descr)
+                print(' ', obj.namespace.ljust(20), '-', obj.descr)
         elif which.find(':') < 0:
             if which in get_commands():
                 obj = get_commands()[which]
