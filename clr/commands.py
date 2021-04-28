@@ -22,9 +22,6 @@ def get_namespaces():
     for key in NAMESPACE_KEYS: get_namespace(key)
     return __namespaces
 
-def has_namespace(key):
-    return key in NAMESPACE_KEYS
-
 def load_namespace(key):
     if key == 'system':
         return System()
@@ -70,7 +67,7 @@ def resolve_command(query):
             namespace_key = query
             command_name = ''
 
-    if not has_namespace(namespace_key):
+    if namespace_key not in NAMESPACE_KEYS:
         close_matches = _get_close_matches(namespace_key, NAMESPACE_KEYS)
         print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: {close_matches}\n\nAvaliable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
         sys.exit(1)
