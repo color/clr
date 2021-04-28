@@ -80,10 +80,10 @@ def resolve_command(query):
 
     return get_namespace(namespace_key), get_command(namespace_key, command_name), namespace_key, command_name
 
-def get_command_spec(command):
+def get_command_spec(cmd):
     """Get a command spec from the given (resolved) command, and
     distinguish default args vs. non-default args."""
-    args, vararg, varkwarg, defvals = inspect.getargspec(command)
+    args, vararg, varkwarg, defvals = inspect.getargspec(cmd)
 
     assert varkwarg is None, 'Variable kwargs are not allowed in commands.'
 
@@ -93,7 +93,7 @@ def get_command_spec(command):
         defvals = tuple()
 
     # Avoid the self argument.
-    if isinstance(command, types.MethodType):
+    if isinstance(cmd, types.MethodType):
         args = args[1:]
 
     nargs = len(args) - len(defvals)
