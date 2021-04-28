@@ -22,7 +22,7 @@ def get_namespaces():
     for key in NAMESPACE_KEYS: get_namespace(key)
     return __namespaces
 
-def load_namespace(key):
+def _load_namespace(key):
     if key == 'system':
         return System()
 
@@ -37,7 +37,7 @@ def get_namespace(namespace_key):
     """Lazily load and return the namespace"""
     global __namespaces
     if namespace_key not in __namespaces:
-        __namespaces[namespace_key] = load_namespace(namespace_key)
+        __namespaces[namespace_key] = _load_namespace(namespace_key)
     return __namespaces[namespace_key]
 
 def list_commands(namespace_key):
