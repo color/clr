@@ -17,27 +17,6 @@ NAMESPACE_KEYS = clr.config.commands().keys() | {'system'}
 # failing initialization.
 __namespaces = {}
 
-def get_command_spec(command):
-    """Get a command spec from the given (resolved) command, and
-    distinguish default args vs. non-default args."""
-    args, vararg, varkwarg, defvals = inspect.getargspec(command)
-
-    assert varkwarg is None, 'Variable kwargs are not allowed in commands.'
-
-    if args is None:
-        args = tuple()
-    if defvals is None:
-        defvals = tuple()
-
-    # Avoid the self argument.
-    if isinstance(command, types.MethodType):
-        args = args[1:]
-
-    nargs = len(args) - len(defvals)
-    args = list(zip(args[:nargs], [intern('default')]*nargs)) + list(zip(args[nargs:], defvals))
-
-    return args, vararg
-
 def get_namespaces():
     # Fill namespace cache
     for key in NAMESPACE_KEYS: get_namespace(key)
@@ -105,6 +84,27 @@ def resolve_command(query):
         sys.exit(1)
 
     return get_namespace(namespace_key), get_command(namespace_key, command_name), namespace_key, command_name
+
+def get_command_spec(command):
+    """Get a command spec from the given (resolved) command, and
+    distinguish default args vs. non-default args."""
+    args, vararg, varkwarg, defvals = inspect.getargspec(command)
+
+    assert varkwarg is None, 'Variable kwargs are not allowed in commands.'
+
+    if args is None:
+        args = tuple()
+    if defvals is None:
+        defvals = tuple()
+
+    # Avoid the self argument.
+    if isinstance(command, types.MethodType):
+        args = args[1:]
+
+    nargs = len(args) - len(defvals)
+    args = list(zip(args[:nargs], [intern('default')]*nargs)) + list(zip(args[nargs:], defvals))
+
+    return args, vararg
 
 class System(object):
     """System namespace for the clr tool.
