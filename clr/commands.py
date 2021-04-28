@@ -13,7 +13,8 @@ import difflib
 import clr.config
 
 NAMESPACE_KEYS = clr.config.commands().keys() | {'system'}
-# Load lazily.
+# Load lazily namespace modules as needed. Some have expensive/occasionally
+# failing initialization.
 __namespaces = {}
 
 def get_command_spec(command):
