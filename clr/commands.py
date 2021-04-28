@@ -48,8 +48,8 @@ def get_command(namespace_key, command_name):
 
 def _get_close_matches(query, options):
     matches = difflib.get_close_matches(query, options, cutoff=.4)
-    if not matches:
-        matches = sorted(o for o in options if o.startswith(query))
+    if query:
+        matches.extend(sorted(o for o in options if o.startswith(query) and o not in matches))
     return matches
 
 def resolve_command(query):
