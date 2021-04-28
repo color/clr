@@ -27,23 +27,21 @@ def has_namespace(key):
 
 def load_namespace(key):
     if key == 'system':
-        obj = System()
-    else:
-        mod_path = clr.config.commands()[key]
-        try:
-           module = import_module(mod_path)
-           obj = module.COMMANDS
-        except Exception as e:
-            print(f"WARNING: Loading namespace '{key}' failed: {e}")
-            obj = ErrorLoadingNamespace(key, e)
+        return System()
 
-    return obj
+    module_path = clr.config.commands()[key]
+    try:
+        module = import_module(module_path)
+        return module.COMMANDS
+    except Exception as e:
+        return ErrorLoadingNamespace(key, e)
 
-def get_namespace(namespace):
+def get_namespace(namespace_key):
+    """Lazily load and return the namespace"""
     global __namespaces
-    if namespace not in __namespaces:
-        __namespaces[namespace] = load_namespace(namespace)
-    return __namespaces[namespace]
+    if namespace_key not in __namespaces:
+        __namespaces[namespace_key] = load_namespace(namespace_key)
+    return __namespaces[namespace_key]
 
 def list_commands(namespace_key):
     return sorted(attr[4:] for attr in dir(get_namespace(namespace_key)) if attr.startswith('cmd_'))
