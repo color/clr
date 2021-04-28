@@ -3,7 +3,6 @@ from importlib import import_module
 from builtins import zip
 from builtins import object
 from past.builtins import intern
-from typing import NamedTuple
 from dataclasses import dataclass
 import inspect
 import sys
