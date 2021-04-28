@@ -11,7 +11,6 @@ import types
 import difflib
 
 import clr.config
-from clr.util import path_of_module
 
 NAMESPACE_KEYS = clr.config.commands().keys() | {'system'}
 # Load lazily.
