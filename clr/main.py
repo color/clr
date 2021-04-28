@@ -24,11 +24,11 @@ def main():
     # Find the first arg that does not start with a '-'. This is the
     # command.
     try:
-        cmd_ = argv[1]
+        query = argv[1]
     except IndexError:
-        cmd_ = 'system:help'
+        query = 'system:help'
 
-    _, cmd, ns_, cmd_ = resolve_command(cmd_)
+    _, cmd, namespace_key, cmd_name = resolve_command(query)
 
     # Parse the command line arguments.
     spec, vararg = get_command_spec(cmd)
@@ -90,7 +90,7 @@ def main():
         sys.exit(1)
 
     # Special case: print global option help.
-    if ns_ == 'system' and cmd_ == 'help':
+    if namespace_key == 'system' and cmd_name == 'help':
         print(ghelp)
 
     # Compose the run hooks.
