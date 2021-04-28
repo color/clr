@@ -69,13 +69,13 @@ def resolve_command(query):
 
     if namespace_key not in NAMESPACE_KEYS:
         close_matches = _get_close_matches(namespace_key, NAMESPACE_KEYS)
-        print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: {close_matches}\n\nAvaliable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
+        print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: {close_matches}\n\nAvailable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
         sys.exit(1)
 
     commands = list_commands(namespace_key)
     if command_name not in commands:
         close_matches = _get_close_matches(command_name, commands)
-        print(f"Error! Command '{command_name} does not exist in namespace '{namespace_key}'.\nClosest matches: {close_matches}\n\nAvaliable commands: {commands}", file=sys.stderr)
+        print(f"Error! Command '{command_name} does not exist in namespace '{namespace_key}'.\nClosest matches: {close_matches}\n\nAvailable commands: {commands}", file=sys.stderr)
         sys.exit(1)
 
     return get_namespace(namespace_key), get_command(namespace_key, command_name), namespace_key, command_name
