@@ -11,6 +11,9 @@ import difflib
 
 import clr.config
 
+# Sentinal for args get in get_command_spec to indicate there is no default.
+NO_DEFAULT = object()
+
 NAMESPACE_KEYS = clr.config.commands().keys() | {'system'}
 # Load lazily namespace modules as needed. Some have expensive/occasionally
 # failing initialization.
@@ -96,7 +99,7 @@ def get_command_spec(cmd):
         args = args[1:]
 
     nargs = len(args) - len(defvals)
-    args = list(zip(args[:nargs], [intern('default')]*nargs)) + list(zip(args[nargs:], defvals))
+    args = list(zip(args[:nargs], [NO_DEFAULT]*nargs)) + list(zip(args[nargs:], defvals))
 
     return args, vararg
 
@@ -145,7 +148,7 @@ class System(object):
         spec, vararg = get_command_spec(command)
 
         def is_default(spec):
-            return a_s[1] == 'default'
+            return spec[1] is NO_DEFAULT
         req = [spec_item for spec_item in spec if is_default(spec_item)]
         notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
 

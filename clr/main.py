@@ -1,14 +1,13 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-from past.builtins import intern
 from builtins import range
 import optparse
 import sys
 import types
 
 import clr
-from clr.commands import get_command_spec, resolve_command
+from clr.commands import get_command_spec, resolve_command, NO_DEFAULT
 from clr.options import add_global_options, handle_global_options
 from functools import reduce
 
@@ -47,7 +46,7 @@ def main():
 
         o = optparse.Option('--%s' % a)
 
-        if defval is intern('default'):
+        if defval is NO_DEFAULT:
             pass
         elif isinstance(defval, bool):
             if defval:
@@ -64,7 +63,7 @@ def main():
 
             o.type = t[0]
 
-        if defval is not intern('default'):
+        if defval is not NO_DEFAULT:
             o.default = defval
 
         o.dest = '_cmd_%s' % a
@@ -84,7 +83,7 @@ def main():
         del kwargs[spec[i][0]]
 
     # Now make sure that all nondefault arguments are specified.
-    defargs = [a_s for a_s in spec if a_s[1] is intern('default')]
+    defargs = [a_s for a_s in spec if a_s[1] is NO_DEFAULT]
     if len(args) < len(defargs):
         print('Not all non-default arguments were specified!', file=sys.stderr)
         sys.exit(1)
