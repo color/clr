@@ -8,7 +8,7 @@ import sys
 import types
 
 import clr
-from clr.commands import get_command_spec, resolve_command
+from clr.commands import get_command_spec, resolve_command, get_command
 from clr.options import add_global_options, handle_global_options
 from functools import reduce
 
@@ -28,10 +28,11 @@ def main():
     except IndexError:
         query = 'system:help'
 
-    _, cmd, namespace_key, cmd_name = resolve_command(query)
+    namespace_key, cmd_name = resolve_command(query)
+    cmd = get_command(namespace_key, cmd_name)
 
     # Parse the command line arguments.
-    spec, vararg = get_command_spec(cmd)
+    spec, vararg, _ = get_command_spec(cmd)
 
     # Construct an option parser for the chosen command by inspecting
     # its arguments.
