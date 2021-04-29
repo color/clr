@@ -4,7 +4,6 @@ from builtins import zip
 from builtins import object
 from past.builtins import intern
 from dataclasses import dataclass
-from typing import Tuple
 import inspect
 import sys
 import textwrap
@@ -19,12 +18,8 @@ NAMESPACE_KEYS = sorted(clr.config.commands().keys() | {'system'})
 # failing initialization.
 __namespaces = {}
 
-def get_namespaces():
-    # Fill namespace cache
-    for key in NAMESPACE_KEYS: get_namespace(key)
-    return __namespaces
-
 def _load_namespace(key):
+    """Imports the module specified by the given key."""
     if key == 'system':
         return System()
 
@@ -43,9 +38,11 @@ def get_namespace(namespace_key):
     return __namespaces[namespace_key]
 
 def list_commands(namespace_key):
+    """List of all commands in the namespace."""
     return sorted(attr[4:] for attr in dir(get_namespace(namespace_key)) if attr.startswith('cmd_'))
 
 def get_command(namespace_key, command_name):
+    """Returns callable for the given namespace:command."""
     return getattr(get_namespace(namespace_key), f'cmd_{command_name}')
 
 def _get_close_matches(query, options):
