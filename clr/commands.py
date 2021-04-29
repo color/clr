@@ -83,7 +83,7 @@ def get_command_spec(cmd):
     distinguish default args vs. non-default args."""
     args, vararg, varkwarg, defvals = inspect.getargspec(cmd)
 
-    if varkwarg is not None:
+    if varkwarg:
         print(f'WARNING: Ignoring kwargs found for clr command {cmd}: {varkwarg}')
 
     if args is None:
