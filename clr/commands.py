@@ -145,7 +145,8 @@ class System(object):
 
         spec, vararg = get_command_spec(command)
 
-        is_default = lambda a_s: a_s[1] is intern('default')
+        def is_default(spec):
+            return a_s[1] == 'default'
         req = [spec_item for spec_item in spec if is_default(spec_item)]
         notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
 
