@@ -7,7 +7,7 @@ import sys
 import types
 
 import clr
-from clr.commands import get_command_spec, resolve_command, get_command, NO_DEFAULT
+from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT
 from clr.options import add_global_options, handle_global_options
 from functools import reduce
 
