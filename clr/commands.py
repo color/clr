@@ -23,14 +23,19 @@ __namespaces = {}
 def _load_namespace(key):
     """Imports the module specified by the given key."""
     if key == 'system':
-        return System()
-
-    module_path = clr.config.commands()[key]
-    try:
-        module = import_module(module_path)
-        return module.COMMANDS
-    except Exception as e:
-        return ErrorLoadingNamespace(key, e)
+        instance = System()
+    else:
+        module_path = clr.config.commands()[key]
+        try:
+            module = import_module(module_path)
+            instance = module.COMMANDS
+        except Exception as e:
+            return ErrorLoadingNamespace(key, e)
+    descr = instance.descr
+    longdescr = instance.longdescr if hasattr(instance, 'longdescr') else descr
+    command_callables = {a[4:]: getattr(instance, a) for a in dir(instance) if a.startswith('cmd_')}
+    command_specs = {n: get_command_spec(c) for n, c in command_callables.items()}
+    return Namespace(descr, longdescr, command_specs, command_callables)
 
 def get_namespace(namespace_key):
     """Lazily load and return the namespace"""
@@ -39,14 +44,6 @@ def get_namespace(namespace_key):
         __namespaces[namespace_key] = _load_namespace(namespace_key)
     return __namespaces[namespace_key]
 
-def list_commands(namespace_key):
-    """List of all commands in the namespace."""
-    return sorted(attr[4:] for attr in dir(get_namespace(namespace_key)) if attr.startswith('cmd_'))
-
-def get_command(namespace_key, command_name):
-    """Returns callable for the given namespace:command."""
-    return getattr(get_namespace(namespace_key), f'cmd_{command_name}')
-
 def _get_close_matches(query, options):
     matches = difflib.get_close_matches(query, options, cutoff=.4)
     if query:
@@ -54,12 +51,12 @@ def _get_close_matches(query, options):
     return matches
 
 def resolve_command(query, cache=None):
-    """Resolve the string `query' into a (namespace_key, command_name, namespace, method) tuple."""
+    """Resolve the string `query' into a (namespace_key, command_name) tuple."""
 
     if ':' in query:
         namespace_key, command_name = query.split(':', 1)
     else:
-        if query in list_commands('system'):
+        if query in get_namespace('system').commands:
             # So that `clr help` works as expected.
             namespace_key = 'system'
             command_name = query
@@ -73,10 +70,9 @@ def resolve_command(query, cache=None):
         print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: {close_matches}\n\nAvailable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
         sys.exit(1)
 
-    commands = cache[namespace_key].commands.keys() if cache else list_commands(namespace_key)
-    if command_name not in commands:
+    namespace = cache[namespace_key] if cache else get_namespace(namespace_key)
+    if command_name not in namespace.commands:
         close_matches = _get_close_matches(command_name, commands)
-        namespace_descr = cache[namespace_key].descr if cache else get_namespace(namespace_key).descr
         print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - {namespace.descr}.\nClosest matches: {close_matches}\n\nAvailable commands: {commands}", file=sys.stderr)
         sys.exit(1)
 
@@ -104,11 +100,86 @@ def get_command_spec(cmd):
 
     return args, vararg, inspect.getdoc(cmd)
 
-@dataclass(frozen=True)
-class NamespaceCacheEntry:
-    commands: dict
+# class BaseNamespace:
+
+#     # @property
+#     def longdescr(self):
+#         return self.descr
+
+@dataclass
+class Namespace:
     descr: str
     longdescr: str
+    command_specs: dict
+    command_callables: dict
+
+    @property
+    def commands(self):
+        return sorted(self.command_specs.keys())
+
+@dataclass(frozen=True)
+class NamespaceCacheEntry:
+    descr: str
+    longdescr: str
+    command_specs: dict
+
+    @staticmethod
+    def create(namespace):
+        return NamespaceCacheEntry(namespace.descr, namespace.longdescr, namespace.command_specs)
+
+    @property
+    def commands(self):
+        return sorted(self.command_specs.keys())
+
+
+@dataclass
+class ErrorLoadingNamespace:
+    """Psuedo namespace for when one can't be loaded to show the error message."""
+    key: str
+    error: Exception
+
+    commands = {}
+    command_specs = {}
+
+    @property
+    def descr(self):
+        return f"ERROR Could not load. See `clr help {self.key}`"
+
+    @property
+    def longdescr(self):
+        return f"Error importing module '{clr.config.commands()[self.key]}' for namespace '{self.key}':\n\n{self.error}"
+
+class NamespaceCache:
+    """Cache introspection on command names and signatures to disk.
+
+    This allows subsequent calls to `clr help` or `clr completion` to be fast.
+    Necessary to work the fact that many clr command namespace modules import
+    the world and initialize state on import.
+    """
+
+    cache = shelve.open('/tmp/clr_cache')
+
+    # def list_commands(self, namespace_key):
+    #     """Cached `list_commands`"""
+    #     return self._get(namespace_key).commands.keys()
+
+    # def descr(self, namespace_key):
+    #     return self._get(namespace_key).descr
+
+    # def longdescr(self, namespace_key):
+    #     return self._get(namespace_key).longdescr
+
+    # def command_spec(self, namespace_key, command_name):
+    #     return self._get(namespace_key).commands[command_name]
+
+    def get(self, namespace_key):
+        if namespace_key not in self.cache:
+            namespace = get_namespace(namespace_key)
+            if isinstance(namespace, ErrorLoadingNamespace): return namespace
+            self.cache[namespace_key] = NamespaceCacheEntry.create(namespace)
+            self.cache.sync()
+        return self.cache[namespace_key]
+
 
 class System(object):
     """System namespace for the clr tool.
@@ -120,39 +191,19 @@ class System(object):
 
     descr = 'clr built-in commands'
 
-    # Cache introspection on cmd names and signatures to disk to that
-    # subsequent calls to `clr help` or `clr completion` are fast.
-    # Work around for our super slow import times.
-    # Delete this file to clear the cache.
-    cache = shelve.open('/tmp/clr_cache')
-
-    def _list_commands(self, namespace_key):
-        """Cached `list_commands`"""
-        return self._get_or_fill_cache(namespace_key).commands.keys()
-
-    def _get_or_fill_cache(self, namespace_key):
-        """Cached `list_commands`"""
-        if namespace_key not in self.cache:
-            namespace = get_namespace(namespace_key)
-            if isinstance(namespace_key, ErrorLoadingNamespace): return
-
-            longdescr = namespace.longdescr if hasattr(namespace, 'longdescr') else namespace.descr
-            commands = {c: get_command_spec(get_command(namespace_key, c)) for c in list_commands(namespace_key)}
-            self.cache[namespace_key] = NamespaceCacheEntry(commands, namespace.descr, longdescr)
-            self.cache.sync()
-        return self.cache[namespace_key]
+    cache = NamespaceCache()
 
     def cmd_completion(self, query=''):
         results = []
 
         if ':' not in query:
             # Suffix system commands with a space.
-            results.extend(f'{c} ' for c in list_commands('system'))
+            results.extend(f'{c} ' for c in self.cache.get('system').commands)
             # Suffix namespaces with a :.
             results.extend(f'{k}:' for k in NAMESPACE_KEYS)
         else:
             namespace_key, _ = query.split(':', 1)
-            results.extend(f'{namespace_key}:{c} ' for c in self._list_commands(namespace_key))
+            results.extend(f'{namespace_key}:{c} ' for c in self.cache.get(namespace_key).commands)
 
         print('\n'.join(r for r in results if r.startswith(query)), end='')
 
@@ -176,16 +227,14 @@ class System(object):
         if not query:
             print('Available namespaces')
             for namespace_key in NAMESPACE_KEYS:
-                entry = self._get_or_fill_cache(namespace_key)
-                print(' ', namespace_key.ljust(20), '-', entry.descr)
+                print(' ', namespace_key.ljust(20), '-', self.cache.get(namespace_key).descr)
             return
 
         # If they passed just one arg and it is a namespace key, print help for the full namespace.
         if query in NAMESPACE_KEYS and not query2:
-            entry = self._get_or_fill_cache(query)
-            print(query, '-', entry.longdescr)
+            print(query, '-', self.cache.get(query).longdescr)
 
-            for command in entry.commands:
+            for command in self.cache.get(query).commands:
                 self.print_help_for_command(query, command, prefix='  ')
             return
 
@@ -198,7 +247,7 @@ class System(object):
             initial_indent=prefix, subsequent_indent=prefix,
             width=70)
 
-        spec, vararg, docstr = self._get_or_fill_cache(namespace_key).commands[command_name]
+        spec, vararg, docstr = self.cache.get(namespace_key).command_specs[command_name]
 
         def is_default(spec):
             return spec[1] is NO_DEFAULT
@@ -230,20 +279,8 @@ class System(object):
         w.initial_indent += '  '
         w.subsequent_indent += '  '
 
-        if docstr is not None:
+        if docstr:
             for l in docstr.split('\n'):
                 print(w.fill(l))
 
-@dataclass
-class ErrorLoadingNamespace:
-    """Psuedo namespace for when one can't be loaded to show the error message."""
-    key: str
-    error: Exception
 
-    @property
-    def descr(self):
-        return f"ERROR Could not load. See `clr help {self.key}`"
-
-    @property
-    def longdescr(self):
-        return f"Error importing module '{clr.config.commands()[self.key]}' for namespace '{self.key}':\n\n{self.error}"

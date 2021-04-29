@@ -7,8 +7,12 @@ import sys
 import types
 
 import clr
+<<<<<<< HEAD
 from clr.commands import get_command_spec, resolve_command, get_command, NO_DEFAULT
 >>>>>>> add caching and 1st pass at bashcompletion
+=======
+from clr.commands import get_command_spec, resolve_command, get_namespace
+>>>>>>> namespace class
 from clr.options import add_global_options, handle_global_options
 from functools import reduce
 
@@ -29,7 +33,7 @@ def main():
         query = 'system:help'
 
     namespace_key, cmd_name = resolve_command(query)
-    cmd = get_command(namespace_key, cmd_name)
+    cmd = get_namespace(namespace_key).command_callables[cmd_name]
 
     # Parse the command line arguments.
     spec, vararg, _ = get_command_spec(cmd)
