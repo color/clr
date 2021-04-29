@@ -174,6 +174,85 @@ class NamespaceCache:
             self.cache.sync()
         return self.cache[namespace_key]
 
+# class BaseNamespace:
+
+#     # @property
+#     def longdescr(self):
+#         return self.descr
+
+@dataclass
+class Namespace:
+    descr: str
+    longdescr: str
+    command_specs: dict
+    command_callables: dict
+
+    @property
+    def commands(self):
+        return sorted(self.command_specs.keys())
+
+@dataclass(frozen=True)
+class NamespaceCacheEntry:
+    descr: str
+    longdescr: str
+    command_specs: dict
+
+    @staticmethod
+    def create(namespace):
+        return NamespaceCacheEntry(namespace.descr, namespace.longdescr, namespace.command_specs)
+
+    @property
+    def commands(self):
+        return sorted(self.command_specs.keys())
+
+
+@dataclass
+class ErrorLoadingNamespace:
+    """Psuedo namespace for when one can't be loaded to show the error message."""
+    key: str
+    error: Exception
+
+    commands = {}
+    command_specs = {}
+
+    @property
+    def descr(self):
+        return f"ERROR Could not load. See `clr help {self.key}`"
+
+    @property
+    def longdescr(self):
+        return f"Error importing module '{clr.config.commands()[self.key]}' for namespace '{self.key}':\n\n{self.error}"
+
+class NamespaceCache:
+    """Cache introspection on command names and signatures to disk.
+
+    This allows subsequent calls to `clr help` or `clr completion` to be fast.
+    Necessary to work the fact that many clr command namespace modules import
+    the world and initialize state on import.
+    """
+
+    cache = shelve.open('/tmp/clr_cache')
+
+    # def list_commands(self, namespace_key):
+    #     """Cached `list_commands`"""
+    #     return self._get(namespace_key).commands.keys()
+
+    # def descr(self, namespace_key):
+    #     return self._get(namespace_key).descr
+
+    # def longdescr(self, namespace_key):
+    #     return self._get(namespace_key).longdescr
+
+    # def command_spec(self, namespace_key, command_name):
+    #     return self._get(namespace_key).commands[command_name]
+
+    def get(self, namespace_key):
+        if namespace_key not in self.cache:
+            namespace = get_namespace(namespace_key)
+            if isinstance(namespace, ErrorLoadingNamespace): return namespace
+            self.cache[namespace_key] = NamespaceCacheEntry.create(namespace)
+            self.cache.sync()
+        return self.cache[namespace_key]
 
 class System(object):
     """System namespace for the clr tool.
@@ -244,12 +323,7 @@ class System(object):
         spec, vararg, docstr = self.cache.get(namespace_key).command_specs[command_name]
 
         def is_default(spec):
-<<<<<<< HEAD
             return spec[1] is NO_DEFAULT
-=======
-            return a_s[1] == 'default'
-
->>>>>>> cleanup
         req = [spec_item for spec_item in spec if is_default(spec_item)]
         notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
 
