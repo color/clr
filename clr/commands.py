@@ -70,7 +70,7 @@ def resolve_command(query, cache=None):
         print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: {close_matches}\n\nAvailable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
         sys.exit(1)
 
-    namespace = cache[namespace_key] if cache else get_namespace(namespace_key)
+    namespace = cache.get(namespace_key) if cache else get_namespace(namespace_key)
     if command_name not in namespace.commands:
         close_matches = _get_close_matches(command_name, commands)
         print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - {namespace.descr}.\nClosest matches: {close_matches}\n\nAvailable commands: {commands}", file=sys.stderr)
@@ -99,12 +99,6 @@ def get_command_spec(cmd):
     args = list(zip(args[:nargs], [NO_DEFAULT]*nargs)) + list(zip(args[nargs:], defvals))
 
     return args, vararg, inspect.getdoc(cmd)
-
-# class BaseNamespace:
-
-#     # @property
-#     def longdescr(self):
-#         return self.descr
 
 @dataclass
 class Namespace:
@@ -250,7 +244,12 @@ class System(object):
         spec, vararg, docstr = self.cache.get(namespace_key).command_specs[command_name]
 
         def is_default(spec):
+<<<<<<< HEAD
             return spec[1] is NO_DEFAULT
+=======
+            return a_s[1] == 'default'
+
+>>>>>>> cleanup
         req = [spec_item for spec_item in spec if is_default(spec_item)]
         notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
 
