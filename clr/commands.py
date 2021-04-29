@@ -9,6 +9,7 @@ import textwrap
 import types
 import difflib
 import shelve
+import os
 
 import clr.config
 
@@ -72,8 +73,8 @@ def resolve_command(query, cache=None):
 
     namespace = cache.get(namespace_key) if cache else get_namespace(namespace_key)
     if command_name not in namespace.commands:
-        close_matches = _get_close_matches(command_name, commands)
-        print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - {namespace.descr}.\nClosest matches: {close_matches}\n\nAvailable commands: {commands}", file=sys.stderr)
+        close_matches = _get_close_matches(command_name, namespace.commands)
+        print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - {namespace.descr}.\nClosest matches: {close_matches}\n\nAvailable commands: {namespace.commands}", file=sys.stderr)
         sys.exit(1)
 
     return namespace_key, command_name
@@ -111,21 +112,6 @@ class Namespace:
     def commands(self):
         return sorted(self.command_specs.keys())
 
-@dataclass(frozen=True)
-class NamespaceCacheEntry:
-    descr: str
-    longdescr: str
-    command_specs: dict
-
-    @staticmethod
-    def create(namespace):
-        return NamespaceCacheEntry(namespace.descr, namespace.longdescr, namespace.command_specs)
-
-    @property
-    def commands(self):
-        return sorted(self.command_specs.keys())
-
-
 @dataclass
 class ErrorLoadingNamespace:
     """Psuedo namespace for when one can't be loaded to show the error message."""
@@ -143,54 +129,6 @@ class ErrorLoadingNamespace:
     def longdescr(self):
         return f"Error importing module '{clr.config.commands()[self.key]}' for namespace '{self.key}':\n\n{self.error}"
 
-class NamespaceCache:
-    """Cache introspection on command names and signatures to disk.
-
-    This allows subsequent calls to `clr help` or `clr completion` to be fast.
-    Necessary to work the fact that many clr command namespace modules import
-    the world and initialize state on import.
-    """
-
-    cache = shelve.open('/tmp/clr_cache')
-
-    # def list_commands(self, namespace_key):
-    #     """Cached `list_commands`"""
-    #     return self._get(namespace_key).commands.keys()
-
-    # def descr(self, namespace_key):
-    #     return self._get(namespace_key).descr
-
-    # def longdescr(self, namespace_key):
-    #     return self._get(namespace_key).longdescr
-
-    # def command_spec(self, namespace_key, command_name):
-    #     return self._get(namespace_key).commands[command_name]
-
-    def get(self, namespace_key):
-        if namespace_key not in self.cache:
-            namespace = get_namespace(namespace_key)
-            if isinstance(namespace, ErrorLoadingNamespace): return namespace
-            self.cache[namespace_key] = NamespaceCacheEntry.create(namespace)
-            self.cache.sync()
-        return self.cache[namespace_key]
-
-# class BaseNamespace:
-
-#     # @property
-#     def longdescr(self):
-#         return self.descr
-
-@dataclass
-class Namespace:
-    descr: str
-    longdescr: str
-    command_specs: dict
-    command_callables: dict
-
-    @property
-    def commands(self):
-        return sorted(self.command_specs.keys())
-
 @dataclass(frozen=True)
 class NamespaceCacheEntry:
     descr: str
@@ -205,24 +143,6 @@ class NamespaceCacheEntry:
     def commands(self):
         return sorted(self.command_specs.keys())
 
-
-@dataclass
-class ErrorLoadingNamespace:
-    """Psuedo namespace for when one can't be loaded to show the error message."""
-    key: str
-    error: Exception
-
-    commands = {}
-    command_specs = {}
-
-    @property
-    def descr(self):
-        return f"ERROR Could not load. See `clr help {self.key}`"
-
-    @property
-    def longdescr(self):
-        return f"Error importing module '{clr.config.commands()[self.key]}' for namespace '{self.key}':\n\n{self.error}"
-
 class NamespaceCache:
     """Cache introspection on command names and signatures to disk.
 
@@ -231,22 +151,13 @@ class NamespaceCache:
     the world and initialize state on import.
     """
 
-    cache = shelve.open('/tmp/clr_cache')
-
-    # def list_commands(self, namespace_key):
-    #     """Cached `list_commands`"""
-    #     return self._get(namespace_key).commands.keys()
-
-    # def descr(self, namespace_key):
-    #     return self._get(namespace_key).descr
-
-    # def longdescr(self, namespace_key):
-    #     return self._get(namespace_key).longdescr
-
-    # def command_spec(self, namespace_key, command_name):
-    #     return self._get(namespace_key).commands[command_name]
+    def __init__(self):
+        self.CACHE_FN = '/tmp/clr_command_cache'
+        self.cache = shelve.open(self.CACHE_FN)
 
     def get(self, namespace_key):
+        # Don't cache the system namespace. It is already loaded.
+        if namespace_key == 'system': return get_namespace('system')
         if namespace_key not in self.cache:
             namespace = get_namespace(namespace_key)
             if isinstance(namespace, ErrorLoadingNamespace): return namespace
@@ -266,9 +177,18 @@ class System(object):
 
     cache = NamespaceCache()
 
-    def cmd_completion(self, query=''):
-        results = []
+    def cmd_clear_cache(self):
+        """Clear clr's cache.
 
+        clr caches command specs to disk to speed up help and completions.
+        Run this to clear the cache if your results are stale."""
+        # Remove file. Process exits after this, will get recreated on next run.
+        os.remove(self.cache.CACHE_FN)
+
+    def cmd_completion(self, query=''):
+        """Completion results for first arg to clr."""
+
+        results = []
         if ':' not in query:
             # Suffix system commands with a space.
             results.extend(f'{c} ' for c in self.cache.get('system').commands)
@@ -281,6 +201,7 @@ class System(object):
         print('\n'.join(r for r in results if r.startswith(query)), end='')
 
     def cmd_profile_imports(self, *namespaces):
+        """Prints some debugging information about how long it takes to import clr namespaces."""
         import time
 
         if not namespaces: namespaces = NAMESPACE_KEYS
@@ -288,7 +209,7 @@ class System(object):
         for index, key in enumerate(namespaces):
             t1 = time.time()
             get_namespace(key)
-            results[f'{index}-{key}'] = time.time() - t1
+            results[f'#{index + 1}-{key}'] = time.time() - t1
 
         print('\n'.join(f'{k}: {int(1000*v)}' for k, v in sorted(results.items(), key=lambda i:i[1])))
 
