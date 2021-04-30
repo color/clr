@@ -47,7 +47,7 @@ def main():
 
         o = optparse.Option('--%s' % a)
 
-        if defval is NO_DEFAULT:
+        if defval == NO_DEFAULT:
             pass
         elif isinstance(defval, bool):
             if defval:
@@ -64,7 +64,7 @@ def main():
 
             o.type = t[0]
 
-        if defval is not NO_DEFAULT:
+        if defval != NO_DEFAULT:
             o.default = defval
 
         o.dest = '_cmd_%s' % a
@@ -84,7 +84,7 @@ def main():
         del kwargs[spec[i][0]]
 
     # Now make sure that all nondefault arguments are specified.
-    defargs = [a_s for a_s in spec if a_s[1] is NO_DEFAULT]
+    defargs = [a_s for a_s in spec if a_s[1] == NO_DEFAULT]
     if len(args) < len(defargs):
         print('Not all non-default arguments were specified!', file=sys.stderr)
         sys.exit(1)

@@ -1,3 +1,4 @@
+# TODO(michael.cusack): Currently just completes the first arg (command name). Update to also support command args.
 _clr_completion()
 {
     local IFS=$'\n'
@@ -12,12 +13,5 @@ _clr_completion()
     __ltrim_colon_completions "$cur"
     return 0
 }
-
-
-
-# if [[ ! "${COMPREPLY[@]}" == *: ]]; then
-#   compopt +o nospace
-# fi
-
 
 complete -F _clr_completion -o nospace clr

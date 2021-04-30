@@ -1,9 +1,8 @@
 from __future__ import print_function
 from importlib import import_module
-from builtins import zip
-from builtins import object
 from dataclasses import dataclass
 import inspect
+from inspect import Signature
 import sys
 import textwrap
 import types
@@ -14,7 +13,9 @@ import os
 import clr.config
 
 # Sentinal for args get in get_command_spec to indicate there is no default.
-NO_DEFAULT = object()
+# Because we are pickling command specs for clr cache use a random int
+# and check for equality rather than object identity.
+NO_DEFAULT = 4194921784511160246
 
 NAMESPACE_KEYS = sorted(clr.config.commands().keys() | {'system'})
 # Load lazily namespace modules as needed. Some have expensive/occasionally
@@ -79,13 +80,16 @@ def resolve_command(query, cache=None):
 
     return namespace_key, command_name
 
-def get_command_spec(cmd):
+def get_command_spec(command_callable):
     """Get a command spec from the given (resolved) command, and
     distinguish default args vs. non-default args."""
-    args, vararg, varkwarg, defvals = inspect.getargspec(cmd)
+    args, vararg, varkwarg, defvals = inspect.getargspec(command_callable)
+    signature = Signature.from_callable(command_callable)
 
+    if signature.return_annotation != Signature.empty:
+        print(f'WARNING: {command_callable} returns a {signature.return_annotation} which is ignored.')
     if varkwarg:
-        print(f'WARNING: Ignoring kwargs found for clr command {cmd}: {varkwarg}')
+        print(f'WARNING: Ignoring kwargs found for clr command {command_callable}: {varkwarg}')
 
     if args is None:
         args = tuple()
@@ -93,13 +97,20 @@ def get_command_spec(cmd):
         defvals = tuple()
 
     # Avoid the self argument.
-    if isinstance(cmd, types.MethodType):
+    if isinstance(command_callable, types.MethodType):
+        # print(f'WARNING: {command_callable} is a method.')
         args = args[1:]
+
+    print(signature)
+    for param in signature.parameters.values():
+        print(f'  {param}')
+        if param.kind == param.VAR_KEYWORD:
+            print(f'WARNING: Ignoring kwargs found for clr command {param} {command_callable}: {varkwarg}')
+
 
     nargs = len(args) - len(defvals)
     args = list(zip(args[:nargs], [NO_DEFAULT]*nargs)) + list(zip(args[nargs:], defvals))
-
-    return args, vararg, inspect.getdoc(cmd)
+    return args, vararg, inspect.getdoc(command_callable)
 
 @dataclass
 class Namespace:
@@ -225,9 +236,8 @@ class System(object):
             return
 
         # If they passed just one arg and it is a namespace key, print help for the full namespace.
+        if query.endswith(':'): query = query[:-1]
         if query in NAMESPACE_KEYS and not query2:
-            print(query, '-', self.cache.get(query).longdescr)
-
             for command in self.cache.get(query).commands:
                 self.print_help_for_command(query, command, prefix='  ')
             return
@@ -244,7 +254,8 @@ class System(object):
         spec, vararg, docstr = self.cache.get(namespace_key).command_specs[command_name]
 
         def is_default(spec):
-            return spec[1] is NO_DEFAULT
+            # print(f'{spec} {NO_DEFAULT} {spec[1] is NO_DEFAULT} {spec[1] == NO_DEFAULT}')
+            return spec[1] == NO_DEFAULT
         req = [spec_item for spec_item in spec if is_default(spec_item)]
         notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
 
@@ -252,7 +263,7 @@ class System(object):
         if len(req) > 0:
             args.append(' '.join(['<%s>' % a for a, _ in req]))
 
-        if len(notreq) > 0:
+        if notreq:
             def atxt(a, v):
                 if isinstance(v, bool):
                     if v:
