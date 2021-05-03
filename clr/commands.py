@@ -16,9 +16,12 @@ import clr.config
 # Sentinal for args get in get_command_spec to indicate there is no default.
 # Because we are pickling command specs for clr cache use a random int
 # and check for equality rather than object identity.
+# TODO(michael.cusack): Move command spec to inspect.Signature and remove this.
 NO_DEFAULT = 4194921784511160246
 
+# Sorted list of command namespace keys.
 NAMESPACE_KEYS = sorted(clr.config.commands().keys() | {'system'})
+
 # Load lazily namespace modules as needed. Some have expensive/occasionally
 # failing initialization.
 __namespaces = {}
@@ -104,7 +107,6 @@ def get_command_spec(command_callable):
 
     # Avoid the self argument.
     if isinstance(command_callable, types.MethodType):
-        # print(f'WARNING: {command_callable} is a method.')
         args = args[1:]
 
     nargs = len(args) - len(defvals)
