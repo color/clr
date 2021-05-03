@@ -139,7 +139,9 @@ class ErrorLoadingNamespace:
     key: str
     error: Exception
 
-    commands = {}
+    # Satisfy the same properties of a `Namespace`, but never have any actual
+    # commands.
+    commands = frozenset()
     command_specs = {}
 
     @property
