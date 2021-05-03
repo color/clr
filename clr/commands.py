@@ -201,7 +201,7 @@ class System(object):
         # Remove file. Process exits after this, will get recreated on next run.
         os.remove(self.cache.CACHE_FN)
 
-    def cmd_completion(self, query=''):
+    def cmd_completion1(self, query=''):
         """Completion results for first arg to clr."""
 
         results = []

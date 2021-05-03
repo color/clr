@@ -2,15 +2,20 @@
 _clr_completion()
 {
     local IFS=$'\n'
-    local cur prev opts
 
-     _get_comp_words_by_ref -n : cur
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    case $COMP_CWORD in
+        1)
+            # First argument. Completes the namespace:command.
+            _get_comp_words_by_ref -n : cur
+            COMPREPLY=( $(clr completion1 "${COMP_WORDS[COMP_CWORD]}") )
+            __ltrim_colon_completions "$cur"
+            ;;
+        *)
+            # Subsequent arguments. For now use default (file name) completion.
+            COMPREPLY=( $(compgen -o default -- "${COMP_WORDS[COMP_CWORD]}") )
+            ;;
+    esac
 
-    COMPREPLY=( $(clr completion ${cur}) )
-
-    __ltrim_colon_completions "$cur"
     return 0
 }
 
