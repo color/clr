@@ -38,9 +38,16 @@ def _load_namespace(key):
         except Exception as e:
             return ErrorLoadingNamespace(key, e)
     descr = instance.descr
-    longdescr = instance.longdescr if hasattr(instance, 'longdescr') else descr
-    command_callables = {a[4:]: getattr(instance, a) for a in dir(instance) if a.startswith('cmd_')}
-    command_specs = {n: get_command_spec(c) for n, c in command_callables.items()}
+    longdescr = getattr(instance, 'longdescr', descr)
+    command_callables = {
+        attribute_name[4:]: getattr(instance, attribute_name)
+        for attribute_name in dir(instance)
+        if attribute_name.startswith('cmd_')
+    }
+    command_specs = {
+        command_name: get_command_spec(command_callable)
+        for command_name, command_callable in command_callables.items()
+    }
     return Namespace(descr, longdescr, command_specs, command_callables)
 
 def get_namespace(namespace_key):
@@ -176,7 +183,8 @@ class NamespaceCache:
         if namespace_key == 'system': return get_namespace('system')
         if namespace_key not in self.cache:
             namespace = get_namespace(namespace_key)
-            if isinstance(namespace, ErrorLoadingNamespace): return namespace
+            if isinstance(namespace, ErrorLoadingNamespace):
+                return namespace
             self.cache[namespace_key] = NamespaceCacheEntry.create(namespace)
             self.cache.sync()
         return self.cache[namespace_key]

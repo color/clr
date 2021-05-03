@@ -18,6 +18,7 @@ setup(name = "clr",
       },
       install_requires=[
         "future>=0.16.0",
+        "dataclasses"
       ],
       license = "MIT",
       )
