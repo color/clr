@@ -9,6 +9,7 @@ import types
 import difflib
 import shelve
 import os
+from collections import namedtuple
 
 import clr.config
 
@@ -80,16 +81,21 @@ def resolve_command(query, cache=None):
 
     return namespace_key, command_name
 
+CommandSpec = namedtuple('CommandSpec', 'args varargs docstr')
 def get_command_spec(command_callable):
     """Get a command spec from the given (resolved) command, and
     distinguish default args vs. non-default args."""
+
+    # TODO(michael.cusack): Move to using Signature and remove deprecated
+    # getargspec.
     args, vararg, varkwarg, defvals = inspect.getargspec(command_callable)
     signature = Signature.from_callable(command_callable)
 
     if signature.return_annotation != Signature.empty:
         print(f'WARNING: {command_callable} returns a {signature.return_annotation} which is ignored.')
-    if varkwarg:
-        print(f'WARNING: Ignoring kwargs found for clr command {command_callable}: {varkwarg}')
+    for param in signature.parameters.values():
+        if param.kind == param.VAR_KEYWORD:
+            print(f'WARNING: Ignoring kwargs found for clr command {param} {command_callable}: {varkwarg}')
 
     if args is None:
         args = tuple()
@@ -101,16 +107,10 @@ def get_command_spec(command_callable):
         # print(f'WARNING: {command_callable} is a method.')
         args = args[1:]
 
-    print(signature)
-    for param in signature.parameters.values():
-        print(f'  {param}')
-        if param.kind == param.VAR_KEYWORD:
-            print(f'WARNING: Ignoring kwargs found for clr command {param} {command_callable}: {varkwarg}')
-
-
     nargs = len(args) - len(defvals)
     args = list(zip(args[:nargs], [NO_DEFAULT]*nargs)) + list(zip(args[nargs:], defvals))
-    return args, vararg, inspect.getdoc(command_callable)
+    return CommandSpec(args, vararg, inspect.getdoc(command_callable))
+
 
 @dataclass
 class Namespace:
