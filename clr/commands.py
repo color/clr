@@ -160,12 +160,15 @@ class NamespaceCache:
     """Cache introspection on command names and signatures to disk.
 
     This allows subsequent calls to `clr help` or `clr completion` to be fast.
-    Necessary to work the fact that many clr command namespace modules import
-    the world and initialize state on import.
+    Necessary to work around the fact that many clr command namespace modules
+    import the world and initialize state on import.
     """
 
     def __init__(self):
-        self.CACHE_FN = '/tmp/clr_command_cache'
+        tmpdir = os.environ.get('TMPDIR', '/tmp')
+        self.CACHE_FN = os.path.join(tmpdir, 'clr_command_cache')
+        # Clr processes are short lived. We don't close the shelve, but are
+        # careful to sync it after writes.
         self.cache = shelve.open(self.CACHE_FN)
 
     def get(self, namespace_key):
@@ -179,7 +182,7 @@ class NamespaceCache:
         return self.cache[namespace_key]
 
 class System(object):
-    """System namespace for the clr tool.
+    """Namespace for system commands in the clr tool.
 
     Commands defined here will be avaliable directly without specifying a
     namespace. For example `clr help` instead of `clr system:help`. Be careful
@@ -249,14 +252,13 @@ class System(object):
         self.print_help_for_command(namespace_key, command_name)
 
     def print_help_for_command(self, namespace_key, command_name, prefix=''):
+        width = os.get_terminal_size().columns
         w = textwrap.TextWrapper(
-            initial_indent=prefix, subsequent_indent=prefix,
-            width=70)
+            initial_indent=prefix, subsequent_indent=prefix, width=width)
 
         spec, vararg, docstr = self.cache.get(namespace_key).command_specs[command_name]
 
         def is_default(spec):
-            # print(f'{spec} {NO_DEFAULT} {spec[1] is NO_DEFAULT} {spec[1] == NO_DEFAULT}')
             return spec[1] == NO_DEFAULT
         req = [spec_item for spec_item in spec if is_default(spec_item)]
         notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
@@ -289,5 +291,4 @@ class System(object):
         if docstr:
             for l in docstr.split('\n'):
                 print(w.fill(l))
-
 
