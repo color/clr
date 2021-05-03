@@ -10,6 +10,7 @@ import difflib
 import shelve
 import os
 from collections import namedtuple
+from typing import Dict, Callable
 
 import clr.config
 
@@ -125,8 +126,8 @@ def get_command_spec(command_callable):
 class Namespace:
     descr: str
     longdescr: str
-    command_specs: dict
-    command_callables: dict
+    command_specs: Dict[str, CommandSpec]
+    command_callables: Dict[str, Callable]
 
     @property
     def commands(self):
