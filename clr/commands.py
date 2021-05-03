@@ -9,6 +9,7 @@ import types
 import difflib
 import shelve
 import os
+import time
 from collections import namedtuple
 from typing import Dict, Callable
 
@@ -229,8 +230,6 @@ class System(object):
 
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
-        import time
-
         if not namespaces: namespaces = NAMESPACE_KEYS
         results = {}
         for index, key in enumerate(namespaces):
