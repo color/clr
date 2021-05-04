@@ -2,7 +2,7 @@ import optparse
 import sys
 import types
 
-from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT, SYSTEM
+from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT
 
 def apply(fn, args, kwargs):
     fn(*args, **kwargs)
