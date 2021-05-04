@@ -1,6 +1,9 @@
 # TODO(michael.cusack): Currently just completes the first arg (command name). Update to also support command args.
 _clr_command_completion()
 {
+    # Using "-o nospace" so we can allow the delegated `clr complete1` to decide
+    # if the arguement is complete. This makes bash only split on newlines.
+    local IFS=$'\n'
     # Completes the namespace:command.
     COMPREPLY=( $(clr completion1 "$cur") )
     # echo $COMPREPLY
@@ -9,9 +12,6 @@ _clr_command_completion()
 
 _clr_completion()
 {
-    # Using "-o nospace" so we can allow the delegated `clr complete1` to decide
-    # if the arguement is complete. This makes bash only split on newlines.
-    local IFS=$'\n'
 
     local prev cur cword words
      _get_comp_words_by_ref -n : prev cur cword words
