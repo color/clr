@@ -10,7 +10,7 @@ import shelve
 import os
 import time
 from collections import namedtuple
-from typing import Dict, Callable
+from typing import Dict, Callable, Any
 
 import clr.config
 
@@ -131,7 +131,7 @@ class Namespace:
     longdescr: str
     command_specs: Dict[str, CommandSpec]
     command_callables: Dict[str, Callable]
-    instance: any
+    instance: Any
 
     @property
     def commands(self):
