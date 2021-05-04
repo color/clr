@@ -33,7 +33,7 @@ def read_namespaces():
 
     find_clrfile() returns a filesystem path. It may not be in the PYTHONPATH.
     Use runpy to "import" the clrfile into a isolated namespace and extract the
-    'commands'. The values of this mapping are python module names that are on
+    'commands'. The values of this mapping are python module names that *are* on
     the PYTHONPATH and can be imported with importlib.import_module.
     """
     return runpy.run_path(find_clrfile())['commands']
