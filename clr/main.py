@@ -70,11 +70,11 @@ def main():
     kwargs = dict([(k[5:], v) for k, v in kwargs])
 
     # Positional args override corresponding kwargs
-    for i in range(min(len(args), len(spec))):
-        del kwargs[spec[i][0]]
+    for i in range(min(len(args), len(spec.args))):
+        del kwargs[spec.args[i][0]]
 
     # Now make sure that all nondefault arguments are specified.
-    defargs = [a_s for a_s in spec if a_s[1] == NO_DEFAULT]
+    defargs = [a_s for a_s in spec.args if a_s[1] == NO_DEFAULT]
     if len(args) < len(defargs):
         print('Not all non-default arguments were specified!', file=sys.stderr)
         get_namespace('system').instance.print_help_for_command(namespace_key, cmd_name)
