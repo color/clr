@@ -25,4 +25,8 @@ def find_clrfile(name='clrfile.py'):
     raise Exception("%s could not be located. Searched in %s" % (name, search_paths))
 
 def read_namespaces():
+    # find_clrfile() returns a filesystem path. It may not be in the PYTHONPATH.
+    # "Import" the clrfile into a isolated namespace and extract the 'commands'
+    # mapping from it. 'commands' maps namespace keys to python module paths
+    # that then can be imported with importlib.import_module.
     return runpy.run_path(find_clrfile())['commands']
