@@ -18,7 +18,7 @@ def main():
 
     # Parse the command line arguments, starting after command name.
     parsed = namespace.arguement_parser(cmd_name).parse_args(sys.argv[2:])
-
+    print(parsed)
     # Turn parsed args namespace into callable bindable args.
     cmd_args = []
     cmd_kwargs = {}

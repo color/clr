@@ -12,6 +12,7 @@ import time
 from collections import namedtuple
 from typing import Dict, Callable
 import argparse
+import itertools
 
 import clr.config
 
@@ -45,12 +46,14 @@ def _load_namespace(key):
         for attribute_name in dir(instance)
         if attribute_name.startswith('cmd_')
     }
-    command_specs = {
-        command_name:  CommandSpec(
-            inspect.getdoc(command_callable),
+    command_specs = {}
+    for command_name, command_callable in command_callables.items():
+        docstr = inspect.getdoc(command_callable)
+        if docstr is None: docstr = ''
+        command_specs[command_name] = CommandSpec(
+            docstr,
             Signature.from_callable(command_callable))
-        for command_name, command_callable in command_callables.items()
-    }
+
     return Namespace(
         key, descr, longdescr, command_specs, command_callables, instance)
 
@@ -96,6 +99,13 @@ def resolve_command(query, cache=None):
 
     return namespace_key, command_name
 
+class ClrArgparseFormatter(argparse.RawDescriptionHelpFormatter):
+    def _format_actions_usage(self, actions, groups):
+        # Reorder the actions to put positional args first. Python sort is stable, so otherwise
+        # maintain order. This has only affects the usage str, not actual parsing.
+        actions.sort(key=lambda a: bool(a.option_strings))
+        return super()._format_actions_usage(actions, groups)
+
 @dataclass
 class Namespace:
     key: str
@@ -115,39 +125,58 @@ class Namespace:
         spec = self.command_specs[command_name]
         parser = argparse.ArgumentParser(
             prog=f'clr {self.key}:{command_name}',
-            description=spec.docstr if spec.docstr else '',
+            description=spec.docstr,
             add_help=False,
-            formatter_class=argparse.RawDescriptionHelpFormatter)
+            formatter_class=ClrArgparseFormatter)
+
+        # Add arguemnt(s) to the parser for each param in the cmd signature.
         for param in spec.signature.parameters.values():
             positional = param.default == Signature.empty
 
             if positional:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
-                    parser.add_argument(param.name, type=str)
+                    # Standard positional param without a default.
+                    # parser.add_argument(param.name, type=str)
+                    group = parser.add_mutually_exclusive_group(required=True)
+                    group.add_argument(param.name, nargs='?')
+                    group.add_argument(f'--{param.name}')
+                    # parser.add_argument(param.name, f'--{param.name}')
                 elif param.kind == param.VAR_POSITIONAL:
+                    # Vararg (*args) param. There will only ever be one of these
+                    # it will be at the end of the positional args.
                     parser.add_argument(param.name, type=str, nargs='*')
                 else:
                     raise AssertionError(f'Unexpected kind of positional param {param.name} in {command_name}: {repr(param.kind)}')
             else:
-                help_text = f"Defaults to {param.name}='{param.default}'"
+                # Args with defaults can be refered to by name and are optional.
+
+                # No support for kwargs.
+                if param.kind not in (param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY):
+                    raise AssertionError(f'Unexpected kwarg **{param.name} in {command_name}.')
+
+                # Assume string type for most args.
                 default_type = str
                 if param.default is not None:
                     default_type = type(param.default)
                 if default_type not in (str, bool, int, float):
                     raise AssertionError(f'Unexpected arg type for {param.name} in {command_name}: {default_type}')
 
-                arg_name = f'--{param.name}'
+                # Put the default in the help text to clarify behavior when it is not specified.
+                help_text = f"Defaults to {param.name}='{param.default}'"
 
                 if default_type == bool:
+                    # Add both the --arg and --noarg options, but make them mutally exclusive.
                     group = parser.add_mutually_exclusive_group()
-                    group.add_argument(arg_name, help=help_text, default=param.default,
+                    group.add_argument(f'--{param.name}', help=help_text, default=param.default,
                         dest=param.name, action='store_true')
                     group.add_argument(f'--no{param.name}', help=help_text, dest=param.name,
                         action='store_false')
                 else:
+                    # Add both as optional (nargs=?) positional and named (--arg) for flexibility.
+                    # Mutually exclusive and have the same dest.
                     group = parser.add_mutually_exclusive_group()
                     group.add_argument(param.name, nargs='?', help=help_text, type=default_type, default=param.default)
-                    group.add_argument(arg_name, help=help_text, type=default_type, default=param.default)
+                    group.add_argument(f'--{param.name}', help=help_text, type=default_type, default=param.default)
         return parser
 
 
@@ -249,14 +278,37 @@ class System:
             results.extend(f'{k}:' for k in NAMESPACE_KEYS)
         else:
             namespace_key, _ = query.split(':', 1)
-            results.extend(f'{namespace_key}:{c} ' for c in self.cache.get(namespace_key).commands)
+            namespace = self.cache.get(namespace_key)
+            results.extend(f'{namespace_key}:{c} ' for c in namespace.commands)
 
         print('\n'.join(r for r in results if r.startswith(query)), end='')
 
-    def cmd_completion2(self, command_name, query=''):
+    def cmd_completion2(self, command_name, partial=''):
         namespace_key, command_name = resolve_command(command_name, cache=self.cache)
-        parser = self.cache.get(namespace_key).arguement_parser(command_name)
-        print(parser)
+        namespace = self.cache.get(namespace_key)
+        parser = namespace.arguement_parser(command_name)
+        # argparse doesn't support any introspection. Reach into they guts and
+        # pull out the bits we need. This isn't perfect, but their internal api
+        # has been stable for years and the worst thing that can break is shell
+        # completion. Existing off the shelf solutions like argcomplete work by
+        # monkey patching argparse before you build your parsers which is even
+        # more brittle.
+
+        options = itertools.chain.from_iterable(action.option_strings
+                                                for action in parser._actions)
+        # partial is prepended with a space to stop argparse from parsing it
+        partial = partial[1:]
+        print('\n'.join(f'{o}=' for o in options if o.startswith(partial)), end='')
+
+    def cmd_argtest(self, a, b, c=4, d=None, e=False):
+        """For testing arg parsing."""
+        print(a, b, c, d, e)
+
+    def cmd_usage(self, query):
+        namespace_key, command_name = resolve_command(query, cache=self.cache)
+        namespace = self.cache.get(namespace_key)
+        parser = namespace.arguement_parser(command_name)
+        print(parser.format_usage())
 
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""

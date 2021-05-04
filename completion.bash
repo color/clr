@@ -10,6 +10,13 @@ _clr_command_completion()
     __ltrim_colon_completions "$cur"
 }
 
+_clr_arg_completion()
+{
+    local IFS=$'\n'
+    # Completes the namespace:command.
+    COMPREPLY=( $(clr completion2 ${words[1]} " $cur") )
+}
+
 _clr_completion()
 {
 
@@ -22,7 +29,9 @@ _clr_completion()
     [ $cword -eq 2 ] && [[ ${words[1]} == "help" ]] && _clr_command_completion && return
 
     # Subsequent arguments. For now use default (file name) completion.
-    _filedir
+    # _filedir
+
+    _clr_arg_completion
 
     return 0
 }

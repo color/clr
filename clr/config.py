@@ -26,7 +26,7 @@ def find_clrfile(name='clrfile.py'):
         file_path = search_path / name
         if file_path.exists():
             return file_path
-    raise Exception("%s could not be located. Searched in %s" % (name, search_paths))
+    raise Exception(f"{name} could not be located. Searched in {search_paths}")
 
 def read_namespaces():
     """Returns a mapping from namespace keys to python module paths.
