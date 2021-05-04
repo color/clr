@@ -32,7 +32,7 @@ def _load_namespace(key):
     """Imports the module specified by the given key."""
     if key == 'system':
         # Defined at end of file.
-        instance = SYSTEM
+        instance = System()
     else:
         module_path = NAMESPACE_MODULE_PATHS[key]
         try:
@@ -51,7 +51,8 @@ def _load_namespace(key):
         command_name: get_command_spec(command_callable)
         for command_name, command_callable in command_callables.items()
     }
-    return Namespace(descr, longdescr, command_specs, command_callables)
+    return Namespace(
+        descr, longdescr, command_specs, command_callables, instance)
 
 def get_namespace(namespace_key):
     """Lazily load and return the namespace"""
@@ -130,6 +131,7 @@ class Namespace:
     longdescr: str
     command_specs: Dict[str, CommandSpec]
     command_callables: Dict[str, Callable]
+    instance: any
 
     @property
     def commands(self):
@@ -307,6 +309,3 @@ class System:
         if docstr:
             for line in docstr.split('\n'):
                 print(text_wrapper.fill(line))
-
-# Singleton instance of System
-SYSTEM = System()

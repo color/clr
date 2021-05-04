@@ -77,7 +77,7 @@ def main():
     defargs = [a_s for a_s in spec if a_s[1] == NO_DEFAULT]
     if len(args) < len(defargs):
         print('Not all non-default arguments were specified!', file=sys.stderr)
-        SYSTEM.print_help_for_command(namespace_key, cmd_name)
+        get_namespace('system').instance.print_help_for_command(namespace_key, cmd_name)
         sys.exit(1)
 
     # Special case: print global option help.
