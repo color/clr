@@ -258,7 +258,9 @@ class System:
         if query.endswith(':'):
             query = query[:-1]
         if query in NAMESPACE_KEYS and not query2:
-            for command in self.cache.get(query).commands:
+            namespace = self.cache.get(query)
+            print(query, '-', namespace.longdescr)
+            for command in namespace.commands:
                 self.print_help_for_command(query, command, prefix='  ')
             return
 
