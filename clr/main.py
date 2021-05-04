@@ -2,7 +2,7 @@ import optparse
 import sys
 import types
 
-from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT, SYSTEM
+from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT
 
 def apply(fn, args, kwargs):
     fn(*args, **kwargs)
@@ -23,11 +23,11 @@ def main():
     cmd = get_namespace(namespace_key).command_callables[cmd_name]
 
     # Parse the command line arguments.
-    spec, vararg, _ = get_command_spec(cmd)
+    spec = get_command_spec(cmd)
 
     # Construct an option parser for the chosen command by inspecting
     # its arguments.
-    for a, defval in spec:
+    for a, defval in spec.args:
         type2str = {
             int: 'int',
             int: 'long',
