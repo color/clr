@@ -107,9 +107,11 @@ class Namespace:
 
     @property
     def commands(self):
+        """Sorted list of command names in this namespace."""
         return sorted(self.command_specs.keys())
 
     def arguement_parser(self, command_name):
+        """Returns an ArgumentParser matching the signature of command."""
         spec = self.command_specs[command_name]
         parser = argparse.ArgumentParser(
             prog=f'clr {self.key}:{command_name}',
