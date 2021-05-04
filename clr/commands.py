@@ -1,4 +1,3 @@
-from __future__ import print_function
 from importlib import import_module
 from dataclasses import dataclass
 import inspect
@@ -21,8 +20,9 @@ import clr.config
 # TODO(michael.cusack): Move command spec to inspect.Signature and remove this.
 NO_DEFAULT = 4194921784511160246
 
+NAMESPACE_MODULE_PATHS = clr.config.read_namespaces()
 # Sorted list of command namespace keys.
-NAMESPACE_KEYS = sorted({'system', *clr.config.commands().keys()})
+NAMESPACE_KEYS = sorted({'system', *NAMESPACE_MODULE_PATHS.keys()})
 
 # Load lazily namespace modules as needed. Some have expensive/occasionally
 # failing initialization.
@@ -31,9 +31,10 @@ __NAMESPACES = {}
 def _load_namespace(key):
     """Imports the module specified by the given key."""
     if key == 'system':
-        instance = System()
+        # Defined at end of file.
+        instance = SYSTEM
     else:
-        module_path = clr.config.commands()[key]
+        module_path = NAMESPACE_MODULE_PATHS[key]
         try:
             module = import_module(module_path)
         except Exception as error:
@@ -306,3 +307,6 @@ class System:
         if docstr:
             for line in docstr.split('\n'):
                 print(text_wrapper.fill(line))
+
+# Singleton instance of System
+SYSTEM = System()

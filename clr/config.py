@@ -2,6 +2,7 @@ from past.builtins import execfile
 from pathlib import Path
 import os.path
 import os
+import runpy
 
 def find_clrfile(name='clrfile.py'):
     """Scan for `clrfile.py` defining clr command namespaces.
@@ -23,16 +24,5 @@ def find_clrfile(name='clrfile.py'):
             return file_path
     raise Exception("%s could not be located. Searched in %s" % (name, search_paths))
 
-def commands():
-    config = _get_config()
-    return config['commands']
-
-def options():
-    config = _get_config()
-    return config['options']
-
-_config_cache = {}
-def _get_config():
-    if not _config_cache:
-        execfile(find_clrfile(), _config_cache)
-    return _config_cache
+def read_namespaces():
+    return runpy.run_path(find_clrfile())['commands']

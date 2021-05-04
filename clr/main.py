@@ -1,15 +1,8 @@
-from __future__ import absolute_import
-from __future__ import print_function
-
-from builtins import range
 import optparse
 import sys
 import types
 
-import clr
-from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT
-from clr.options import add_global_options, handle_global_options
-from functools import reduce
+from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT, SYSTEM
 
 def apply(fn, args, kwargs):
     fn(*args, **kwargs)
@@ -17,7 +10,6 @@ def apply(fn, args, kwargs):
 def main():
     argv = sys.argv
     parser = optparse.OptionParser(add_help_option=False)
-    add_global_options(parser)
     ghelp = parser.format_option_help()
 
     # Find the first arg that does not start with a '-'. This is the
@@ -73,8 +65,6 @@ def main():
 
     opts, args = parser.parse_args(argv[2:])
 
-    hooks = handle_global_options(opts)
-
     # The first argument is the command.
     kwargs = [k_v for k_v in list(opts.__dict__.items()) if k_v[0].startswith('_cmd_')]
     kwargs = dict([(k[5:], v) for k, v in kwargs])
@@ -87,16 +77,11 @@ def main():
     defargs = [a_s for a_s in spec if a_s[1] == NO_DEFAULT]
     if len(args) < len(defargs):
         print('Not all non-default arguments were specified!', file=sys.stderr)
+        SYSTEM.print_help_for_command(namespace_key, cmd_name)
         sys.exit(1)
 
     # Special case: print global option help.
     if namespace_key == 'system' and cmd_name == 'help':
         print(ghelp)
 
-    # Compose the run hooks.
-    run = reduce(
-        lambda c, fun: (lambda *a, **kw: fun(c, a, kw)),
-        hooks.get('run', [apply])
-    )
-
-    run(cmd, args, kwargs)
+    cmd(*args, **kwargs)
