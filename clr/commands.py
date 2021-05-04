@@ -309,3 +309,7 @@ class System:
         if docstr:
             for line in docstr.split('\n'):
                 print(text_wrapper.fill(line))
+
+    def cmd_argtest(self, a, b, c=4, d=None, e=False):
+        """For testing arg parsing."""
+        print(a, b, c, d, e)
