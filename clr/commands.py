@@ -87,24 +87,28 @@ def resolve_command(query, cache=None):
 
     if namespace_key not in NAMESPACE_KEYS:
         close_matches = _get_close_matches(namespace_key, NAMESPACE_KEYS)
-        print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: {close_matches}\n\nAvailable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
+        print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: "
+              f"{close_matches}\n\nAvailable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
         sys.exit(1)
 
     namespace = cache.get(namespace_key) if cache else get_namespace(namespace_key)
     if command_name not in namespace.commands:
         close_matches = _get_close_matches(command_name, namespace.commands)
-        print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - {namespace.descr}.\nClosest matches: {close_matches}\n\nAvailable commands: {namespace.commands}", file=sys.stderr)
+        print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - "
+              f"{namespace.descr}.\nClosest matches: {close_matches}\n\nAvailable commands: "
+              f"{namespace.commands}", file=sys.stderr)
         print(f'See `clr help {namespace_key}` for details.')
         sys.exit(1)
 
     return namespace_key, command_name
 
 class ClrArgparseFormatter(argparse.RawDescriptionHelpFormatter):
-    def _format_actions_usage(self, actions, groups):
-        # Reorder the actions to put positional args first. Python sort is stable, so otherwise
-        # maintain order. This has only affects the usage str, not actual parsing.
-        actions.sort(key=lambda a: bool(a.option_strings))
-        return super()._format_actions_usage(actions, groups)
+    pass
+    # def _format_actions_usage(self, actions, groups):
+    #     # Reorder the actions to put positional args first. Python sort is stable, so otherwise
+    #     # maintain order. This has only affects the usage str, not actual parsing.
+    #     actions.sort(key=lambda a: bool(a.option_strings))
+    #     return super()._format_actions_usage(actions, groups)
 
 @dataclass
 class Namespace:
@@ -137,16 +141,18 @@ class Namespace:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
                     # Standard positional param without a default.
                     # parser.add_argument(param.name, type=str)
-                    group = parser.add_mutually_exclusive_group(required=True)
+                    gp = parser.add_argument_group('Mutually exclusive')
+                    group = gp.add_mutually_exclusive_group(required=True)
+                    group.add_argument(f'--{param.name}', default='foo')
                     group.add_argument(param.name, nargs='?')
-                    group.add_argument(f'--{param.name}')
                     # parser.add_argument(param.name, f'--{param.name}')
                 elif param.kind == param.VAR_POSITIONAL:
                     # Vararg (*args) param. There will only ever be one of these
                     # it will be at the end of the positional args.
                     parser.add_argument(param.name, type=str, nargs='*')
                 else:
-                    raise AssertionError(f'Unexpected kind of positional param {param.name} in {command_name}: {repr(param.kind)}')
+                    raise AssertionError(f'Unexpected kind of positional param {param.name} in '
+                                         f'{command_name}: {repr(param.kind)}')
             else:
                 # Args with defaults can be refered to by name and are optional.
 
@@ -159,7 +165,8 @@ class Namespace:
                 if param.default is not None:
                     default_type = type(param.default)
                 if default_type not in (str, bool, int, float):
-                    raise AssertionError(f'Unexpected arg type for {param.name} in {command_name}: {default_type}')
+                    raise AssertionError(f'Unexpected arg type for {param.name} in {command_name}: '
+                                         f'{default_type}')
 
                 # Put the default in the help text to clarify behavior when it is not specified.
                 help_text = f"Defaults to {param.name}='{param.default}'"
@@ -175,8 +182,10 @@ class Namespace:
                     # Add both as optional (nargs=?) positional and named (--arg) for flexibility.
                     # Mutually exclusive and have the same dest.
                     group = parser.add_mutually_exclusive_group()
-                    group.add_argument(param.name, nargs='?', help=help_text, type=default_type, default=param.default)
-                    group.add_argument(f'--{param.name}', help=help_text, type=default_type, default=param.default)
+                    group.add_argument(param.name, nargs='?', help=help_text, type=default_type,
+                        default=param.default)
+                    group.add_argument(f'--{param.name}', help=help_text, type=default_type,
+                        default=param.default)
         return parser
 
 
@@ -200,7 +209,8 @@ class ErrorLoadingNamespace:
 
     @property
     def longdescr(self):
-        return f"Error importing module '{NAMESPACE_MODULE_PATHS[self.key]}' for namespace '{self.key}':\n\n{self.error}"
+        return (f"Error importing module '{NAMESPACE_MODULE_PATHS[self.key]}' for namespace "
+                f"'{self.key}':\n\n{self.error}")
 
 @dataclass(frozen=True)
 class NamespaceCacheEntry:
@@ -303,6 +313,8 @@ class System:
     def cmd_argtest(self, a, b, c=4, d=None, e=False):
         """For testing arg parsing."""
         print(a, b, c, d, e)
+        print(f'------------{a}--------------------------------------------'
+            f'----------------------{a}-------------')
 
     def cmd_usage(self, query):
         namespace_key, command_name = resolve_command(query, cache=self.cache)
