@@ -10,7 +10,7 @@ import shelve
 import os
 import time
 from collections import namedtuple
-from typing import Dict, Callable
+from typing import Dict, Callable, Any
 import argparse
 import itertools
 
@@ -102,13 +102,18 @@ def resolve_command(query, cache=None):
 
     return namespace_key, command_name
 
-class ClrArgparseFormatter(argparse.RawDescriptionHelpFormatter):
-    pass
-    # def _format_actions_usage(self, actions, groups):
-    #     # Reorder the actions to put positional args first. Python sort is stable, so otherwise
-    #     # maintain order. This has only affects the usage str, not actual parsing.
-    #     actions.sort(key=lambda a: bool(a.option_strings))
-    #     return super()._format_actions_usage(actions, groups)
+class NoneIgnoringArgparseDestination(argparse.Namespace):
+    """argparse destination namespace that ignores attributes changed to None.
+
+    In order to allow arguments to be specified as positional or named (--a A) we add two mutally
+    # exlusive arguments with the same dest. The positional one has nargs=? which means when it is
+    left out it will always set None. In practice there is no way to explicitly and purposfully set
+    an argument to None, so we simply ignore attempts to set an attribute to None if is currently
+    has a value.
+    """
+    def __setattr__(self, attr, value):
+        if value is not None:
+            super().__setattr__(attr, value)
 
 @dataclass
 class Namespace:
@@ -117,21 +122,54 @@ class Namespace:
     longdescr: str
     command_specs: Dict[str, CommandSpec]
     command_callables: Dict[str, Callable]
-    instance: any
+    instance: Any
 
     @property
     def commands(self):
         """Sorted list of command names in this namespace."""
         return sorted(self.command_specs.keys())
 
-    def arguement_parser(self, command_name):
-        """Returns an ArgumentParser matching the signature of command."""
+    def parse_args(self, command_name, argv):
+        """Parse args for the given command."""
+
+        signature = self.command_specs[command_name].signature
+        # Parse the command line arguments, starting after command name.
+        parsed = NoneIgnoringArgparseDestination()
+        self.argument_parser(command_name).parse_args(sys.argv[2:], namespace=parsed)
+
+        # Turn parsed args namespace into callable bindable args.
+        cmd_args = []
+        cmd_kwargs = {}
+        for param in signature.parameters.values():
+            value = getattr(parsed, param.name, None)
+            if param.kind  == param.POSITIONAL_ONLY:
+                cmd_args.append(value)
+            elif param.kind == param.VAR_POSITIONAL:
+                cmd_args.extend(value)
+            elif param.kind in (param.KEYWORD_ONLY, param.POSITIONAL_OR_KEYWORD):
+                if param.default != param.empty and value is None:
+                    # BoundArguments will apply the defaults.
+                    continue
+                cmd_kwargs[param.name] = value
+
+        # Ensure the signature is valid. Could be skipped, but adds correctness and
+        # gives a nice error message when something is wrong.
+        bound = signature.bind(*cmd_args, **cmd_kwargs)
+        bound.apply_defaults()
+        return bound
+
+    def argument_parser(self, command_name):
+        """Returns an ArgumentParser matching the signature of command.
+
+        Defaults are not specified in the parser spec because they are applied via the signature
+        binding.
+        """
         spec = self.command_specs[command_name]
         parser = argparse.ArgumentParser(
             prog=f'clr {self.key}:{command_name}',
             description=spec.docstr,
             add_help=False,
-            formatter_class=ClrArgparseFormatter)
+            formatter_class=argparse.RawDescriptionHelpFormatter)
 
         # Add arguemnt(s) to the parser for each param in the cmd signature.
         for param in spec.signature.parameters.values():
@@ -141,10 +179,12 @@ class Namespace:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
                     # Standard positional param without a default.
                     # parser.add_argument(param.name, type=str)
-                    gp = parser.add_argument_group('Mutually exclusive')
-                    group = gp.add_mutually_exclusive_group(required=True)
-                    group.add_argument(f'--{param.name}', default='foo')
-                    group.add_argument(param.name, nargs='?')
+                    # gp = parser.add_argument_group('Mutually exclusive')
+                    group = parser.add_mutually_exclusive_group(required=True)
+                    group.add_argument(f'--{param.name}',
+                        help=f'Required. Can also be specified with positional arg {param.name}.')
+                    group.add_argument(param.name, nargs='?',
+                        help=f'Required. Can also be specified with --{param.name}.')
                     # parser.add_argument(param.name, f'--{param.name}')
                 elif param.kind == param.VAR_POSITIONAL:
                     # Vararg (*args) param. There will only ever be one of these
@@ -169,23 +209,22 @@ class Namespace:
                                          f'{default_type}')
 
                 # Put the default in the help text to clarify behavior when it is not specified.
-                help_text = f"Defaults to {param.name}='{param.default}'"
+                help_text = f"Optional. Defaults to {param.name}='{param.default}'."
 
                 if default_type == bool:
                     # Add both the --arg and --noarg options, but make them mutally exclusive.
                     group = parser.add_mutually_exclusive_group()
-                    group.add_argument(f'--{param.name}', help=help_text, default=param.default,
-                        dest=param.name, action='store_true')
-                    group.add_argument(f'--no{param.name}', help=help_text, dest=param.name,
-                        action='store_false')
+                    group.add_argument(f'--{param.name}', action='store_true', help=help_text)
+                    group.add_argument(f'--no{param.name}', dest=param.name, action='store_false',
+                        help=help_text)
                 else:
                     # Add both as optional (nargs=?) positional and named (--arg) for flexibility.
                     # Mutually exclusive and have the same dest.
                     group = parser.add_mutually_exclusive_group()
-                    group.add_argument(param.name, nargs='?', help=help_text, type=default_type,
-                        default=param.default)
-                    group.add_argument(f'--{param.name}', help=help_text, type=default_type,
-                        default=param.default)
+                    group.add_argument(param.name, nargs='?', type=default_type,
+                        help=f'{help_text} Can also be specified with --{param.name}.')
+                    group.add_argument(f'--{param.name}', type=default_type,
+                        help=f'{help_text} Can also be specified with positional arg {param.name}.')
         return parser
 
 
@@ -226,7 +265,7 @@ class NamespaceCacheEntry:
 
 # Steal some functionality.
 NamespaceCacheEntry.commands = Namespace.commands
-NamespaceCacheEntry.arguement_parser = Namespace.arguement_parser
+NamespaceCacheEntry.argument_parser = Namespace.argument_parser
 
 
 class NamespaceCache:
@@ -293,10 +332,12 @@ class System:
 
         print('\n'.join(r for r in results if r.startswith(query)), end='')
 
-    def cmd_completion2(self, command_name, partial=''):
+    def cmd_completion2(self, command_name, partial='', bools_only=False):
+        """Completion results for arguments."""
+
         namespace_key, command_name = resolve_command(command_name, cache=self.cache)
         namespace = self.cache.get(namespace_key)
-        parser = namespace.arguement_parser(command_name)
+        parser = namespace.argument_parser(command_name)
         # argparse doesn't support any introspection. Reach into they guts and
         # pull out the bits we need. This isn't perfect, but their internal api
         # has been stable for years and the worst thing that can break is shell
@@ -304,22 +345,24 @@ class System:
         # monkey patching argparse before you build your parsers which is even
         # more brittle.
 
-        options = itertools.chain.from_iterable(action.option_strings
-                                                for action in parser._actions)
+        options = []
+        for action in parser._actions:
+            if bools_only and not isinstance(action, argparse._StoreConstAction):
+                continue
+            options.extend(action.option_strings)
+
         # partial is prepended with a space to stop argparse from parsing it
-        partial = partial[1:]
-        print('\n'.join(f'{o}=' for o in options if o.startswith(partial)), end='')
+        partial = partial.strip()
+        print('\n'.join(f'{o} ' for o in options if o.startswith(partial)), end='')
 
     def cmd_argtest(self, a, b, c=4, d=None, e=False):
         """For testing arg parsing."""
         print(a, b, c, d, e)
-        print(f'------------{a}--------------------------------------------'
-            f'----------------------{a}-------------')
 
     def cmd_usage(self, query):
         namespace_key, command_name = resolve_command(query, cache=self.cache)
         namespace = self.cache.get(namespace_key)
-        parser = namespace.arguement_parser(command_name)
+        parser = namespace.argument_parser(command_name)
         print(parser.format_usage())
 
     def cmd_profile_imports(self, *namespaces):
@@ -364,7 +407,7 @@ class System:
 
     def print_help_for_command(self, namespace, command):
         try:
-            self.cache.get(namespace).arguement_parser(command).print_help()
+            self.cache.get(namespace).argument_parser(command).print_help()
         except BrokenPipeError:
             # Less noisy if help is piped to `head`, etc.
             pass
