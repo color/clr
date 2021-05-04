@@ -4,6 +4,10 @@ import os.path
 import os
 import runpy
 
+"""The clr tool is configred using a python source file (clrfile.py) that is
+distributed externally to this tool. On start up we scan for this file and
+import it to initialize the command list"""
+
 def find_clrfile(name='clrfile.py'):
     """Scan for `clrfile.py` defining clr command namespaces.
 
@@ -25,8 +29,11 @@ def find_clrfile(name='clrfile.py'):
     raise Exception("%s could not be located. Searched in %s" % (name, search_paths))
 
 def read_namespaces():
-    # find_clrfile() returns a filesystem path. It may not be in the PYTHONPATH.
-    # "Import" the clrfile into a isolated namespace and extract the 'commands'
-    # mapping from it. 'commands' maps namespace keys to python module paths
-    # that then can be imported with importlib.import_module.
+    """Returns a mapping from namespace keys to python module paths.
+
+    find_clrfile() returns a filesystem path. It may not be in the PYTHONPATH.
+    Use runpy to "import" the clrfile into a isolated namespace and extract the
+    'commands'. The values of this mapping are python module names that are on
+    the PYTHONPATH and can be imported with importlib.import_module.
+    """
     return runpy.run_path(find_clrfile())['commands']
