@@ -1,4 +1,3 @@
-from __future__ import print_function
 from importlib import import_module
 from dataclasses import dataclass
 import inspect
@@ -11,7 +10,7 @@ import shelve
 import os
 import time
 from collections import namedtuple
-from typing import Dict, Callable
+from typing import Dict, Callable, Any
 
 import clr.config
 
@@ -21,8 +20,9 @@ import clr.config
 # TODO(michael.cusack): Move command spec to inspect.Signature and remove this.
 NO_DEFAULT = 4194921784511160246
 
+NAMESPACE_MODULE_PATHS = clr.config.read_namespaces()
 # Sorted list of command namespace keys.
-NAMESPACE_KEYS = sorted({'system', *clr.config.commands().keys()})
+NAMESPACE_KEYS = sorted({'system', *NAMESPACE_MODULE_PATHS.keys()})
 
 # Load lazily namespace modules as needed. Some have expensive/occasionally
 # failing initialization.
@@ -31,9 +31,10 @@ __NAMESPACES = {}
 def _load_namespace(key):
     """Imports the module specified by the given key."""
     if key == 'system':
+        # Defined at end of file.
         instance = System()
     else:
-        module_path = clr.config.commands()[key]
+        module_path = NAMESPACE_MODULE_PATHS[key]
         try:
             module = import_module(module_path)
         except Exception as error:
@@ -50,7 +51,8 @@ def _load_namespace(key):
         command_name: get_command_spec(command_callable)
         for command_name, command_callable in command_callables.items()
     }
-    return Namespace(descr, longdescr, command_specs, command_callables)
+    return Namespace(
+        descr, longdescr, command_specs, command_callables, instance)
 
 def get_namespace(namespace_key):
     """Lazily load and return the namespace"""
@@ -129,6 +131,7 @@ class Namespace:
     longdescr: str
     command_specs: Dict[str, CommandSpec]
     command_callables: Dict[str, Callable]
+    instance: Any
 
     @property
     def commands(self):
@@ -306,3 +309,7 @@ class System:
         if docstr:
             for line in docstr.split('\n'):
                 print(text_wrapper.fill(line))
+
+    def cmd_argtest(self, a, b, c=4, d=None, e=False):
+        """For testing arg parsing."""
+        print(a, b, c, d, e)

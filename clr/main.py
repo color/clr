@@ -1,15 +1,8 @@
-from __future__ import absolute_import
-from __future__ import print_function
-
-from builtins import range
 import optparse
 import sys
 import types
 
-import clr
 from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT
-from clr.options import add_global_options, handle_global_options
-from functools import reduce
 
 def apply(fn, args, kwargs):
     fn(*args, **kwargs)
@@ -17,7 +10,6 @@ def apply(fn, args, kwargs):
 def main():
     argv = sys.argv
     parser = optparse.OptionParser(add_help_option=False)
-    add_global_options(parser)
     ghelp = parser.format_option_help()
 
     # Find the first arg that does not start with a '-'. This is the
@@ -31,11 +23,11 @@ def main():
     cmd = get_namespace(namespace_key).command_callables[cmd_name]
 
     # Parse the command line arguments.
-    spec, vararg, _ = get_command_spec(cmd)
+    spec = get_command_spec(cmd)
 
     # Construct an option parser for the chosen command by inspecting
     # its arguments.
-    for a, defval in spec:
+    for a, defval in spec.args:
         type2str = {
             int: 'int',
             int: 'long',
@@ -73,30 +65,23 @@ def main():
 
     opts, args = parser.parse_args(argv[2:])
 
-    hooks = handle_global_options(opts)
-
     # The first argument is the command.
     kwargs = [k_v for k_v in list(opts.__dict__.items()) if k_v[0].startswith('_cmd_')]
     kwargs = dict([(k[5:], v) for k, v in kwargs])
 
     # Positional args override corresponding kwargs
-    for i in range(min(len(args), len(spec))):
-        del kwargs[spec[i][0]]
+    for i in range(min(len(args), len(spec.args))):
+        del kwargs[spec.args[i][0]]
 
     # Now make sure that all nondefault arguments are specified.
-    defargs = [a_s for a_s in spec if a_s[1] == NO_DEFAULT]
+    defargs = [a_s for a_s in spec.args if a_s[1] == NO_DEFAULT]
     if len(args) < len(defargs):
         print('Not all non-default arguments were specified!', file=sys.stderr)
+        get_namespace('system').instance.print_help_for_command(namespace_key, cmd_name)
         sys.exit(1)
 
     # Special case: print global option help.
     if namespace_key == 'system' and cmd_name == 'help':
         print(ghelp)
 
-    # Compose the run hooks.
-    run = reduce(
-        lambda c, fun: (lambda *a, **kw: fun(c, a, kw)),
-        hooks.get('run', [apply])
-    )
-
-    run(cmd, args, kwargs)
+    cmd(*args, **kwargs)
