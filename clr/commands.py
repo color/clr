@@ -95,14 +95,14 @@ def resolve_command(query, cache=None):
 
     return namespace_key, command_name
 
-CommandSpec = namedtuple('CommandSpec', 'args varargs docstr')
+CommandSpec = namedtuple('CommandSpec', 'args varargs docstr signature')
 def get_command_spec(command_callable):
     """Get a command spec from the given (resolved) command, and
     distinguish default args vs. non-default args."""
 
     # TODO(michael.cusack): Move to using Signature and remove deprecated
     # getargspec.
-    args, vararg, varkwarg, defvals = inspect.getargspec(command_callable)
+    args, varargs, varkwarg, defvals = inspect.getargspec(command_callable)
     signature = Signature.from_callable(command_callable)
 
     if signature.return_annotation != Signature.empty:
@@ -122,7 +122,7 @@ def get_command_spec(command_callable):
 
     nargs = len(args) - len(defvals)
     args = list(zip(args[:nargs], [NO_DEFAULT]*nargs)) + list(zip(args[nargs:], defvals))
-    return CommandSpec(args, vararg, inspect.getdoc(command_callable))
+    return CommandSpec(args, varargs, inspect.getdoc(command_callable), signature)
 
 
 @dataclass
@@ -277,12 +277,12 @@ class System:
         text_wrapper = textwrap.TextWrapper(
             initial_indent=prefix, subsequent_indent=prefix, width=width)
 
-        spec, vararg, docstr = self.cache.get(namespace_key).command_specs[command_name]
+        spec = self.cache.get(namespace_key).command_specs[command_name]
 
-        def is_default(spec):
-            return spec[1] == NO_DEFAULT
-        req = [spec_item for spec_item in spec if is_default(spec_item)]
-        notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
+        def is_default(arg):
+            return arg[1] == NO_DEFAULT
+        req = [arg for arg in spec.args if is_default(arg)]
+        notreq = [arg for arg in spec.args if not is_default(arg)]
 
         args = []
         if len(req) > 0:
@@ -298,14 +298,14 @@ class System:
             arg_texts = [arg_text(arg_name, default_value) for arg_name, default_value in notreq]
             args.append('[%s]' % ' '.join(arg_texts))
 
-        if vararg is not None:
-            args.append('[%s...]' % vararg)
+        if spec.varargs is not None:
+            args.append('[%s...]' % spec.varargs)
 
         print(text_wrapper.fill('%s %s' % (command_name, ' '.join(args))))
 
         text_wrapper.initial_indent += '  '
         text_wrapper.subsequent_indent += '  '
 
-        if docstr:
-            for line in docstr.split('\n'):
+        if spec.docstr:
+            for line in spec.docstr.split('\n'):
                 print(text_wrapper.fill(line))

@@ -2,7 +2,7 @@ import optparse
 import sys
 import types
 
-from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT, SYSTEM
+from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DEFAULT
 
 def apply(fn, args, kwargs):
     fn(*args, **kwargs)
@@ -23,11 +23,11 @@ def main():
     cmd = get_namespace(namespace_key).command_callables[cmd_name]
 
     # Parse the command line arguments.
-    spec, vararg, _ = get_command_spec(cmd)
+    spec = get_command_spec(cmd)
 
     # Construct an option parser for the chosen command by inspecting
     # its arguments.
-    for a, defval in spec:
+    for a, defval in spec.args:
         type2str = {
             int: 'int',
             int: 'long',
@@ -70,11 +70,11 @@ def main():
     kwargs = dict([(k[5:], v) for k, v in kwargs])
 
     # Positional args override corresponding kwargs
-    for i in range(min(len(args), len(spec))):
-        del kwargs[spec[i][0]]
+    for i in range(min(len(args), len(spec.args))):
+        del kwargs[spec.args[i][0]]
 
     # Now make sure that all nondefault arguments are specified.
-    defargs = [a_s for a_s in spec if a_s[1] == NO_DEFAULT]
+    defargs = [a_s for a_s in spec.args if a_s[1] == NO_DEFAULT]
     if len(args) < len(defargs):
         print('Not all non-default arguments were specified!', file=sys.stderr)
         get_namespace('system').instance.print_help_for_command(namespace_key, cmd_name)
