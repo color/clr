@@ -11,14 +11,11 @@ import os
 import time
 from collections import namedtuple
 from typing import Dict, Callable
+import argparse
 
 import clr.config
 
-# Sentinal for arg defaults in get_command_spec to indicate there is no default.
-# Because we are pickling command specs for clr cache, use a random int and
-# check for equality rather than object identity.
-# TODO(michael.cusack): Move command spec to inspect.Signature and remove this.
-NO_DEFAULT = 4194921784511160246
+CommandSpec = namedtuple('CommandSpec', 'docstr signature')
 
 NAMESPACE_MODULE_PATHS = clr.config.read_namespaces()
 # Sorted list of command namespace keys.
@@ -41,18 +38,21 @@ def _load_namespace(key):
             return ErrorLoadingNamespace(key, error)
         instance = module.COMMANDS
     descr = instance.descr
-    longdescr = getattr(instance, 'longdescr', descr)
+    # Prefer doc string, otherwise explicit .longdescr, otherwise .descr
+    longdescr = inspect.getdoc(instance) or getattr(instance, 'longdescr', descr)
     command_callables = {
         attribute_name[4:]: getattr(instance, attribute_name)
         for attribute_name in dir(instance)
         if attribute_name.startswith('cmd_')
     }
     command_specs = {
-        command_name: get_command_spec(command_callable)
+        command_name:  CommandSpec(
+            inspect.getdoc(command_callable),
+            Signature.from_callable(command_callable))
         for command_name, command_callable in command_callables.items()
     }
     return Namespace(
-        descr, longdescr, command_specs, command_callables, instance)
+        key, descr, longdescr, command_specs, command_callables, instance)
 
 def get_namespace(namespace_key):
     """Lazily load and return the namespace"""
@@ -91,42 +91,14 @@ def resolve_command(query, cache=None):
     if command_name not in namespace.commands:
         close_matches = _get_close_matches(command_name, namespace.commands)
         print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - {namespace.descr}.\nClosest matches: {close_matches}\n\nAvailable commands: {namespace.commands}", file=sys.stderr)
+        print(f'See `clr help {namespace_key}` for details.')
         sys.exit(1)
 
     return namespace_key, command_name
 
-CommandSpec = namedtuple('CommandSpec', 'args varargs docstr signature')
-def get_command_spec(command_callable):
-    """Get a command spec from the given (resolved) command, and
-    distinguish default args vs. non-default args."""
-
-    # TODO(michael.cusack): Move to using Signature and remove deprecated
-    # getargspec.
-    args, varargs, varkwarg, defvals = inspect.getargspec(command_callable)
-    signature = Signature.from_callable(command_callable)
-
-    if signature.return_annotation != Signature.empty:
-        print(f'WARNING: {command_callable} returns a {signature.return_annotation} which is ignored.')
-    for param in signature.parameters.values():
-        if param.kind == param.VAR_KEYWORD:
-            print(f'WARNING: Ignoring kwargs found for clr command {param} {command_callable}: {varkwarg}')
-
-    if args is None:
-        args = tuple()
-    if defvals is None:
-        defvals = tuple()
-
-    # Avoid the self argument.
-    if isinstance(command_callable, types.MethodType):
-        args = args[1:]
-
-    nargs = len(args) - len(defvals)
-    args = list(zip(args[:nargs], [NO_DEFAULT]*nargs)) + list(zip(args[nargs:], defvals))
-    return CommandSpec(args, varargs, inspect.getdoc(command_callable), signature)
-
-
 @dataclass
 class Namespace:
+    key: str
     descr: str
     longdescr: str
     command_specs: Dict[str, CommandSpec]
@@ -137,16 +109,59 @@ class Namespace:
     def commands(self):
         return sorted(self.command_specs.keys())
 
+    def arguement_parser(self, command_name):
+        spec = self.command_specs[command_name]
+        parser = argparse.ArgumentParser(
+            prog=f'clr {self.key}:{command_name}',
+            description=spec.docstr if spec.docstr else '',
+            add_help=False,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
+        for param in spec.signature.parameters.values():
+            positional = param.default == Signature.empty
+
+            if positional:
+                if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
+                    parser.add_argument(param.name, type=str)
+                elif param.kind == param.VAR_POSITIONAL:
+                    parser.add_argument(param.name, type=str, nargs='*')
+                else:
+                    raise AssertionError(f'Unexpected kind of positional param {param.name} in {command_name}: {repr(param.kind)}')
+            else:
+                help_text = f"Defaults to {param.name}='{param.default}'"
+                default_type = str
+                if param.default is not None:
+                    default_type = type(param.default)
+                if default_type not in (str, bool, int, float):
+                    raise AssertionError(f'Unexpected arg type for {param.name} in {command_name}: {default_type}')
+
+                arg_name = f'--{param.name}'
+
+                if default_type == bool:
+                    group = parser.add_mutually_exclusive_group()
+                    group.add_argument(arg_name, help=help_text, default=param.default,
+                        dest=param.name, action='store_true')
+                    group.add_argument(f'--no{param.name}', help=help_text, dest=param.name,
+                        action='store_false')
+                else:
+                    group = parser.add_mutually_exclusive_group()
+                    group.add_argument(param.name, nargs='?', help=help_text, type=default_type, default=param.default)
+                    group.add_argument(arg_name, help=help_text, type=default_type, default=param.default)
+        return parser
+
+
 @dataclass
 class ErrorLoadingNamespace:
     """Psuedo namespace for when one can't be loaded to show the error message."""
     key: str
     error: Exception
 
-    # Satisfy the same properties of a `Namespace`, but never have any actual
-    # commands.
-    commands = frozenset()
-    command_specs = {}
+    @property
+    def commands(self):
+        return tuple()
+
+    @property
+    def command_specs(self):
+        return {}
 
     @property
     def descr(self):
@@ -154,21 +169,24 @@ class ErrorLoadingNamespace:
 
     @property
     def longdescr(self):
-        return f"""Error importing module '{clr.config.commands()[self.key]}' for namespace '{self.key}':\n\n{self.error}"""
+        return f"Error importing module '{NAMESPACE_MODULE_PATHS[self.key]}' for namespace '{self.key}':\n\n{self.error}"
 
 @dataclass(frozen=True)
 class NamespaceCacheEntry:
+    key: str
     descr: str
     longdescr: str
     command_specs: dict
 
     @staticmethod
     def create(namespace):
-        return NamespaceCacheEntry(namespace.descr, namespace.longdescr, namespace.command_specs)
+        return NamespaceCacheEntry(namespace.key, namespace.descr,
+            namespace.longdescr, namespace.command_specs)
 
-    @property
-    def commands(self):
-        return sorted(self.command_specs.keys())
+# Steal some functionality.
+NamespaceCacheEntry.commands = Namespace.commands
+NamespaceCacheEntry.arguement_parser = Namespace.arguement_parser
+
 
 class NamespaceCache:
     """Cache introspection on command names and signatures to disk.
@@ -233,6 +251,11 @@ class System:
 
         print('\n'.join(r for r in results if r.startswith(query)), end='')
 
+    def cmd_completion2(self, command_name, query=''):
+        namespace_key, command_name = resolve_command(command_name, cache=self.cache)
+        parser = self.cache.get(namespace_key).arguement_parser(command_name)
+        print(parser)
+
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
         if not namespaces:
@@ -262,9 +285,10 @@ class System:
             query = query[:-1]
         if query in NAMESPACE_KEYS and not query2:
             namespace = self.cache.get(query)
-            print(query, '-', namespace.longdescr)
+            print(f'{query} - {namespace.longdescr}\n')
             for command in namespace.commands:
-                self.print_help_for_command(query, command, prefix='  ')
+                print('-' * 80)
+                self.print_help_for_command(query, command)
             return
 
         if query2:
@@ -272,40 +296,9 @@ class System:
         namespace_key, command_name = resolve_command(query, cache=self.cache)
         self.print_help_for_command(namespace_key, command_name)
 
-    def print_help_for_command(self, namespace_key, command_name, prefix=''):
-        width = os.get_terminal_size().columns
-        text_wrapper = textwrap.TextWrapper(
-            initial_indent=prefix, subsequent_indent=prefix, width=width)
-
-        spec = self.cache.get(namespace_key).command_specs[command_name]
-
-        def is_default(arg):
-            return arg[1] == NO_DEFAULT
-        req = [arg for arg in spec.args if is_default(arg)]
-        notreq = [arg for arg in spec.args if not is_default(arg)]
-
-        args = []
-        if len(req) > 0:
-            args.append(' '.join(['<%s>' % a for a, _ in req]))
-
-        if notreq:
-            def arg_text(arg_name, default_value):
-                if isinstance(default_value, bool):
-                    if default_value:
-                        return f'--no{arg_name}'
-                    return f'--{arg_name}'
-                return f'--{arg_name}={default_value}'
-            arg_texts = [arg_text(arg_name, default_value) for arg_name, default_value in notreq]
-            args.append('[%s]' % ' '.join(arg_texts))
-
-        if spec.varargs is not None:
-            args.append('[%s...]' % spec.varargs)
-
-        print(text_wrapper.fill('%s %s' % (command_name, ' '.join(args))))
-
-        text_wrapper.initial_indent += '  '
-        text_wrapper.subsequent_indent += '  '
-
-        if spec.docstr:
-            for line in spec.docstr.split('\n'):
-                print(text_wrapper.fill(line))
+    def print_help_for_command(self, namespace, command):
+        try:
+            self.cache.get(namespace).arguement_parser(command).print_help()
+        except BrokenPipeError:
+            # Less noisy if help is piped to `head`, etc.
+            pass
