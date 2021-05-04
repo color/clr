@@ -15,14 +15,14 @@ from typing import Dict, Callable
 
 import clr.config
 
-# Sentinal for args get in get_command_spec to indicate there is no default.
-# Because we are pickling command specs for clr cache use a random int
-# and check for equality rather than object identity.
+# Sentinal for arg defaults in get_command_spec to indicate there is no default.
+# Because we are pickling command specs for clr cache, use a random int and
+# check for equality rather than object identity.
 # TODO(michael.cusack): Move command spec to inspect.Signature and remove this.
 NO_DEFAULT = 4194921784511160246
 
 # Sorted list of command namespace keys.
-NAMESPACE_KEYS = sorted(clr.config.commands().keys() | {'system'})
+NAMESPACE_KEYS = sorted({'system', *clr.config.commands().keys()})
 
 # Load lazily namespace modules as needed. Some have expensive/occasionally
 # failing initialization.
@@ -36,9 +36,9 @@ def _load_namespace(key):
         module_path = clr.config.commands()[key]
         try:
             module = import_module(module_path)
-            instance = module.COMMANDS
         except Exception as e:
             return ErrorLoadingNamespace(key, e)
+        instance = module.COMMANDS
     descr = instance.descr
     longdescr = getattr(instance, 'longdescr', descr)
     command_callables = {

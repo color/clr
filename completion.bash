@@ -2,17 +2,19 @@
 _clr_completion()
 {
     local IFS=$'\n'
+    local cur cword
+     _get_comp_words_by_ref -n : cur cword
 
-    case $COMP_CWORD in
+    case $cword in
         1)
             # First argument. Completes the namespace:command.
-            _get_comp_words_by_ref -n : cur
-            COMPREPLY=( $(clr completion1 "${COMP_WORDS[COMP_CWORD]}") )
+            COMPREPLY=( $(clr completion1 "$cur") )
+            # echo $COMPREPLY
             __ltrim_colon_completions "$cur"
             ;;
         *)
             # Subsequent arguments. For now use default (file name) completion.
-            COMPREPLY=( $(compgen -o default -- "${COMP_WORDS[COMP_CWORD]}") )
+            COMPREPLY=( $(compgen -o default -- "$cur") )
             ;;
     esac
 
