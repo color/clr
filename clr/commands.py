@@ -26,7 +26,7 @@ NAMESPACE_KEYS = sorted({'system', *clr.config.commands().keys()})
 
 # Load lazily namespace modules as needed. Some have expensive/occasionally
 # failing initialization.
-__namespaces = {}
+__NAMESPACES = {}
 
 def _load_namespace(key):
     """Imports the module specified by the given key."""
@@ -36,8 +36,8 @@ def _load_namespace(key):
         module_path = clr.config.commands()[key]
         try:
             module = import_module(module_path)
-        except Exception as e:
-            return ErrorLoadingNamespace(key, e)
+        except Exception as error:
+            return ErrorLoadingNamespace(key, error)
         instance = module.COMMANDS
     descr = instance.descr
     longdescr = getattr(instance, 'longdescr', descr)
@@ -54,10 +54,10 @@ def _load_namespace(key):
 
 def get_namespace(namespace_key):
     """Lazily load and return the namespace"""
-    global __namespaces
-    if namespace_key not in __namespaces:
-        __namespaces[namespace_key] = _load_namespace(namespace_key)
-    return __namespaces[namespace_key]
+    global __NAMESPACES
+    if namespace_key not in __NAMESPACES:
+        __NAMESPACES[namespace_key] = _load_namespace(namespace_key)
+    return __NAMESPACES[namespace_key]
 
 def _get_close_matches(query, options):
     matches = difflib.get_close_matches(query, options, cutoff=.4)
@@ -151,7 +151,7 @@ class ErrorLoadingNamespace:
 
     @property
     def longdescr(self):
-        return f"Error importing module '{clr.config.commands()[self.key]}' for namespace '{self.key}':\n\n{self.error}"
+        return f"""Error importing module '{clr.config.commands()[self.key]}' for namespace '{self.key}':\n\n{self.error}"""
 
 @dataclass(frozen=True)
 class NamespaceCacheEntry:
@@ -177,14 +177,16 @@ class NamespaceCache:
 
     def __init__(self):
         tmpdir = os.environ.get('TMPDIR', '/tmp')
-        self.CACHE_FN = os.path.join(tmpdir, 'clr_command_cache')
+        self.cache_fn = os.path.join(tmpdir, 'clr_command_cache')
         # Clr processes are short lived. We don't close the shelve, but are
         # careful to sync it after writes.
-        self.cache = shelve.open(self.CACHE_FN)
+        self.cache = shelve.open(self.cache_fn)
 
     def get(self, namespace_key):
         # Don't cache the system namespace. It is already loaded.
-        if namespace_key == 'system': return get_namespace('system')
+        if namespace_key == 'system':
+            return get_namespace('system')
+        # Load namespace and save spec to the shelve.
         if namespace_key not in self.cache:
             namespace = get_namespace(namespace_key)
             if isinstance(namespace, ErrorLoadingNamespace):
@@ -193,7 +195,7 @@ class NamespaceCache:
             self.cache.sync()
         return self.cache[namespace_key]
 
-class System(object):
+class System:
     """Namespace for system commands in the clr tool.
 
     Commands defined here will be avaliable directly without specifying a
@@ -211,7 +213,7 @@ class System(object):
         clr caches command specs to disk to speed up help and completions.
         Run this to clear the cache if your results are stale."""
         # Remove file. Process exits after this, will get recreated on next run.
-        os.remove(self.cache.CACHE_FN)
+        os.remove(self.cache.cache_fn)
 
     def cmd_completion1(self, query=''):
         """Completion results for first arg to clr."""
@@ -230,14 +232,16 @@ class System(object):
 
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
-        if not namespaces: namespaces = NAMESPACE_KEYS
+        if not namespaces:
+            namespaces = NAMESPACE_KEYS
         results = {}
         for index, key in enumerate(namespaces):
-            t1 = time.time()
+            start_time = time.time()
             get_namespace(key)
-            results[f'#{index + 1}-{key}'] = time.time() - t1
+            results[f'#{index + 1}-{key}'] = time.time() - start_time
 
-        print('\n'.join(f'{k}: {int(1000*v)}' for k, v in sorted(results.items(), key=lambda i:i[1])))
+        print('\n'.join(f'{k}: {int(1000*v)}'
+                        for k, v in sorted(results.items(), key=lambda i:i[1])))
 
     def cmd_help(self, query=None, query2=None):
         """
@@ -251,19 +255,21 @@ class System(object):
             return
 
         # If they passed just one arg and it is a namespace key, print help for the full namespace.
-        if query.endswith(':'): query = query[:-1]
+        if query.endswith(':'):
+            query = query[:-1]
         if query in NAMESPACE_KEYS and not query2:
             for command in self.cache.get(query).commands:
                 self.print_help_for_command(query, command, prefix='  ')
             return
 
-        if query2: query = f'{query}:{query2}'
+        if query2:
+            query = f'{query}:{query2}'
         namespace_key, command_name = resolve_command(query, cache=self.cache)
         self.print_help_for_command(namespace_key, command_name)
 
     def print_help_for_command(self, namespace_key, command_name, prefix=''):
         width = os.get_terminal_size().columns
-        w = textwrap.TextWrapper(
+        text_wrapper = textwrap.TextWrapper(
             initial_indent=prefix, subsequent_indent=prefix, width=width)
 
         spec, vararg, docstr = self.cache.get(namespace_key).command_specs[command_name]
@@ -278,27 +284,23 @@ class System(object):
             args.append(' '.join(['<%s>' % a for a, _ in req]))
 
         if notreq:
-            def atxt(a, v):
-                if isinstance(v, bool):
-                    if v:
-                        return '--no%s' % a
-                    else:
-                        return '--%s' % a
-
-                else:
-                    return '--%s=%s' % (a, v)
-
-            args.append('[%s]' % ' '.join([atxt(a, v) for a, v in notreq]))
+            def arg_text(arg_name, default_value):
+                if isinstance(default_value, bool):
+                    if default_value:
+                        return f'--no{arg_name}'
+                    return f'--{arg_name}'
+                return f'--{arg_name}={default_value}'
+            arg_texts = [arg_text(arg_name, default_value) for arg_name, default_value in notreq]
+            args.append('[%s]' % ' '.join(arg_texts))
 
         if vararg is not None:
             args.append('[%s...]' % vararg)
 
-        print(w.fill('%s %s' % (command_name, ' '.join(args))))
+        print(text_wrapper.fill('%s %s' % (command_name, ' '.join(args))))
 
-        w.initial_indent += '  '
-        w.subsequent_indent += '  '
+        text_wrapper.initial_indent += '  '
+        text_wrapper.subsequent_indent += '  '
 
         if docstr:
-            for l in docstr.split('\n'):
-                print(w.fill(l))
-
+            for line in docstr.split('\n'):
+                print(text_wrapper.fill(line))
