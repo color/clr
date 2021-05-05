@@ -182,7 +182,7 @@ class Namespace:
             add_help=False,
             formatter_class=argparse.RawDescriptionHelpFormatter)
 
-        # Add arguemnt(s) to the parser for each param in the cmd signature.
+        # Add argument(s) to the parser for each param in the cmd signature.
         for param in spec.signature.parameters.values():
             positional = param.default == Signature.empty
 
