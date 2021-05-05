@@ -4,7 +4,7 @@ _clr_command_completion()
     # if the arguement is complete. This makes bash only split on newlines.
     local IFS=$'\n'
     # Completes the namespace:command.
-    COMPREPLY=( $(clr completion1 "$cur") )
+    COMPREPLY=( $(clr completion_command "$cur") )
     __ltrim_colon_completions "$cur"
 }
 
@@ -12,7 +12,7 @@ _clr_arg_completion()
 {
     local IFS=$'\n'
     # Completes the flags.
-    COMPREPLY=( $(clr completion2 ${words[1]} " $cur") )
+    COMPREPLY=( $(clr completion_arg ${words[1]} " $cur") )
 }
 
 _clr_completion()
@@ -38,7 +38,7 @@ _clr_completion()
     then
 
         # Check if it was a boolean flag.
-        clr completion2 --bools_only ${words[1]} | grep "^$prev" > /dev/null
+        clr completion_arg --bools_only ${words[1]} | grep "^$prev" > /dev/null
         if [ $? -eq 0 ]
         then
             # This will be an arg too.
@@ -47,6 +47,9 @@ _clr_completion()
         fi
 
         # This is a value, for now use default (file name) completion.
+        # TODO(mpcusack): Signal if this should be some other builtin completion like known
+        # host, etc. Allow deeper integration to more precise completion. Perhaps
+        # `def completion_command_name`.
         _filedir
         return
     fi

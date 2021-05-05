@@ -80,7 +80,7 @@ def resolve_command(query, cache=None):
         namespace_key, command_name = query.split(':', 1)
     else:
         if query in get_namespace('system').commands:
-            # System commands can be refered to w/o a namesapce o that `clr help` works as
+            # System commands can be refered to w/o a namesapce so that `clr help` works as
             # expected.
             namespace_key = 'system'
             command_name = query
@@ -233,7 +233,7 @@ class Namespace:
 
 @dataclass
 class ErrorLoadingNamespace:
-    """Psuedo namespace for when one can't be loaded to show the error message."""
+    """Psuedo namespace for when one can't be loaded to show the error message in `clr help`."""
     key: str
     error: Exception
 
@@ -256,6 +256,7 @@ class ErrorLoadingNamespace:
 
 @dataclass(frozen=True)
 class NamespaceCacheEntry:
+    """Picke-able subset of Namespace for NamespaceCache."""
     key: str
     descr: str
     longdescr: str
@@ -265,16 +266,14 @@ class NamespaceCacheEntry:
     def create(namespace):
         return NamespaceCacheEntry(namespace.key, namespace.descr,
             namespace.longdescr, namespace.command_specs)
-
 # Steal some functionality.
 NamespaceCacheEntry.commands = Namespace.commands
 NamespaceCacheEntry.argument_parser = Namespace.argument_parser
 
-
 class NamespaceCache:
     """Cache introspection on command names and signatures to disk.
 
-    This allows subsequent calls to `clr help` or `clr completion` to be fast.
+    This allows subsequent calls to `clr help` or `clr completion_*` to be fast.
     Necessary to work around the fact that many clr command namespace modules
     import the world and initialize state on import.
     """
@@ -319,7 +318,7 @@ class System:
         # Remove file. Process exits after this, will get recreated on next run.
         os.remove(self.cache.cache_fn)
 
-    def cmd_completion1(self, query=''):
+    def cmd_completion_command(self, query=''):
         """Completion results for first arg to clr."""
 
         results = []
@@ -335,7 +334,7 @@ class System:
 
         print('\n'.join(r for r in results if r.startswith(query)), end='')
 
-    def cmd_completion2(self, command_name, partial='', bools_only=False):
+    def cmd_completion_arg(self, command_name, partial='', bools_only=False):
         """Completion results for arguments.
 
         Optionally only prints out the boolean flags."""
