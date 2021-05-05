@@ -15,8 +15,6 @@ import argparse
 
 import clr.config
 
-CommandSpec = namedtuple('CommandSpec', 'docstr signature')
-
 NAMESPACE_MODULE_PATHS = clr.config.read_namespaces()
 # Sorted list of command namespace keys.
 NAMESPACE_KEYS = sorted({'system', *NAMESPACE_MODULE_PATHS.keys()})
@@ -51,13 +49,14 @@ def _load_namespace(key):
     command_specs = {}
     for command_name, command_callable in command_callables.items():
         docstr = inspect.getdoc(command_callable)
-        if docstr is None: docstr = ''
+        if docstr is None:
+            docstr = ''
         command_specs[command_name] = CommandSpec(
             docstr,
             Signature.from_callable(command_callable))
 
-    return Namespace(
-        key, descr, longdescr, command_specs, command_callables, instance)
+    return Namespace(key=key, descr=descr, longdescr=longdescr, command_specs=command_specs,
+        command_callables=command_callables, instance=instance)
 
 def get_namespace(namespace_key):
     """Lazily load and return a namespace"""
@@ -67,7 +66,8 @@ def get_namespace(namespace_key):
     return __NAMESPACES[namespace_key]
 
 def _get_close_matches(query, options):
-    """Utility function for making suggests in command not found messages."""
+    """Utility function for making suggests when `resolve_command` can't resolve a namespace/command
+    name."""
     matches = difflib.get_close_matches(query, options, cutoff=.4)
     if query:
         matches.extend(sorted(o for o in options if o.startswith(query) and o not in matches))
@@ -80,7 +80,7 @@ def resolve_command(query, cache=None):
         namespace_key, command_name = query.split(':', 1)
     else:
         if query in get_namespace('system').commands:
-            # System commands can be refered to w/o a namesapce so that `clr help` works as
+            # System commands can be referred to w/o a namespace so that `clr help` works as
             # expected.
             namespace_key = 'system'
             command_name = query
@@ -120,6 +120,12 @@ class NoneIgnoringArgparseDestination(argparse.Namespace):
             super().__setattr__(attr, value)
 
 @dataclass
+class CommandSpec:
+    """Pickle-able specification of a command."""
+    docstr: str
+    signature: Signature
+
+@dataclass
 class Namespace:
     """clr command namespace."""
     key: str
@@ -142,7 +148,7 @@ class Namespace:
         parsed = NoneIgnoringArgparseDestination()
         self.argument_parser(command_name).parse_args(sys.argv[2:], namespace=parsed)
 
-        # Turn parsed args into somethign we can pass to signature.bind.
+        # Turn parsed args into something we can pass to signature.bind.
         args = []
         kwargs = {}
         for param in signature.parameters.values():
