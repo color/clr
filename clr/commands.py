@@ -87,7 +87,7 @@ def resolve_command(query, cache=None):
     if namespace_key not in NAMESPACE_KEYS:
         close_matches = _get_close_matches(namespace_key, NAMESPACE_KEYS)
         print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: "
-              f"{close_matches}\n\nAvailable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
+              f"{close_matches}\n\nAvailable namespaces: {NAMESPACE_KEYS}", file=sys.stderr)
         sys.exit(1)
 
     namespace = cache.get(namespace_key) if cache else get_namespace(namespace_key)
