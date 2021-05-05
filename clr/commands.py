@@ -244,7 +244,6 @@ class Namespace:
             required = param.default == Signature.empty
 
             if required:
-                print(name, param.kind)
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
                     if has_var_positional:
                         parser.add_argument(name, type=str, help=f'Required.')
