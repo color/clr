@@ -179,8 +179,6 @@ class Namespace:
             if positional:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
                     # Standard positional param without a default.
-                    # parser.add_argument(param.name, type=str)
-                    # gp = parser.add_argument_group('Mutually exclusive')
                     group = parser.add_mutually_exclusive_group(required=True)
                     group.add_argument(f'--{param.name}',
                         help=f'Required. Can also be specified with positional arg {param.name}.')
