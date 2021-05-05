@@ -174,6 +174,9 @@ class Namespace:
 
         Defaults are not specified in the parser spec because they are applied via the signature
         binding.
+
+        General scheme for is
+        - All
         """
         spec = self.command_specs[command_name]
         parser = argparse.ArgumentParser(
