@@ -26,7 +26,7 @@ NAMESPACE_KEYS = sorted({'system', *NAMESPACE_MODULE_PATHS.keys()})
 __NAMESPACES = {}
 
 def _load_namespace(key):
-    """Imports the module specified by the given key."""
+    """Imports a namespace module."""
     if key == 'system':
         # Defined at end of file.
         instance = System()
@@ -60,13 +60,14 @@ def _load_namespace(key):
         key, descr, longdescr, command_specs, command_callables, instance)
 
 def get_namespace(namespace_key):
-    """Lazily load and return the namespace"""
+    """Lazily load and return a namespace"""
     global __NAMESPACES
     if namespace_key not in __NAMESPACES:
         __NAMESPACES[namespace_key] = _load_namespace(namespace_key)
     return __NAMESPACES[namespace_key]
 
 def _get_close_matches(query, options):
+    """Utility function for making suggests in command not found messages."""
     matches = difflib.get_close_matches(query, options, cutoff=.4)
     if query:
         matches.extend(sorted(o for o in options if o.startswith(query) and o not in matches))
@@ -79,7 +80,8 @@ def resolve_command(query, cache=None):
         namespace_key, command_name = query.split(':', 1)
     else:
         if query in get_namespace('system').commands:
-            # So that `clr help` works as expected.
+            # System commands can be refered to w/o a namesapce o that `clr help` works as
+            # expected.
             namespace_key = 'system'
             command_name = query
         else:
@@ -88,18 +90,17 @@ def resolve_command(query, cache=None):
             command_name = ''
 
     if namespace_key not in NAMESPACE_KEYS:
-        close_matches = _get_close_matches(namespace_key, NAMESPACE_KEYS)
         print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: "
-              f"{close_matches}\n\nAvailable namespaces: {NAMESPACE_KEYS}", file=sys.stderr)
+              f"{_get_close_matches(namespace_key, NAMESPACE_KEYS)}\n\nAvailable namespaces: "
+              f"{NAMESPACE_KEYS}", file=sys.stderr)
         sys.exit(1)
 
     namespace = cache.get(namespace_key) if cache else get_namespace(namespace_key)
     if command_name not in namespace.commands:
-        close_matches = _get_close_matches(command_name, namespace.commands)
         print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - "
-              f"{namespace.descr}.\nClosest matches: {close_matches}\n\nAvailable commands: "
-              f"{namespace.commands}", file=sys.stderr)
-        print(f'See `clr help {namespace_key}` for details.')
+              f"{namespace.descr}.\nClosest matches: "
+              f"{_get_close_matches(command_name, namespace.commands)}\n\nAvailable commands: "
+              f"{namespace.commands}\nSee `clr help {namespace_key}` for details.", file=sys.stderr)
         sys.exit(1)
 
     return namespace_key, command_name
