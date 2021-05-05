@@ -361,7 +361,7 @@ class System:
 
     def cmd_argtest(self, a, b, c=4, d=None, e=False):
         """For testing arg parsing."""
-        print(a, b, c, d, e)
+        print(f'a={a} b={b} c={c} d={d} e={e}')
 
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
@@ -378,8 +378,17 @@ class System:
 
     def cmd_help(self, query=None, query2=None):
         """
-        provides help for commands, when specified, `query' can be one
-        either a namespace or a namespace:command tuple.
+        provides help for commands.
+
+        $ clr help
+        Prints all a short description of all namespaces.
+
+        $ clr namespace
+        Prints help for all commands in a namescape.
+
+        $ clr namespace:command
+        $ clr namescape command
+        Prints help for a command.
         """
         if not query:
             print('Available namespaces')
