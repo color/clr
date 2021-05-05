@@ -12,4 +12,3 @@ def main():
 
     # Call the command.
     namespace.command_callables[cmd_name](*bound.args, **bound.kwargs)
-

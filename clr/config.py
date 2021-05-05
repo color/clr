@@ -1,12 +1,12 @@
-from past.builtins import execfile
+"""The clr tool is configred using a python source file (clrfile.py) that is
+distributed externally to this tool. On start up we scan for this file and
+import it to initialize the command list
+"""
+
 from pathlib import Path
 import os.path
 import os
 import runpy
-
-"""The clr tool is configred using a python source file (clrfile.py) that is
-distributed externally to this tool. On start up we scan for this file and
-import it to initialize the command list"""
 
 def find_clrfile(name='clrfile.py'):
     """Scan for `clrfile.py` defining clr command namespaces.
