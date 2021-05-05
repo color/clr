@@ -45,6 +45,9 @@ def _load_namespace(key):
         for attribute_name in dir(instance)
         if attribute_name.startswith('cmd_')
     }
+    # Build CommandSpecs for each command. These contain metadata about the
+    # command and its args. These are kept in a seperate dataclass from the
+    # callables because CommandSpec's are pickle-able and cached to disk.
     command_specs = {}
     for command_name, command_callable in command_callables.items():
         docstr = inspect.getdoc(command_callable)
