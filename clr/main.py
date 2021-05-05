@@ -8,7 +8,7 @@ def main():
 
     namespace_key, cmd_name = resolve_command(query)
     namespace = get_namespace(namespace_key)
-    bound = namespace.parse_args(cmd_name, sys.argv[2:])
+    bound_args = namespace.parse_args(cmd_name, sys.argv[2:])
 
     # Call the command.
-    namespace.command_callables[cmd_name](*bound.args, **bound.kwargs)
+    namespace.command_callables[cmd_name](*bound_args.args, **bound_args.kwargs)
