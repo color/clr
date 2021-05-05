@@ -178,13 +178,13 @@ class Namespace:
 
             if positional:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
-                    # Standard positional param without a default.
+                    # Standard positional param without a default. Allow to be added as a positional
+                    # OR named arg. One must be specified.
                     group = parser.add_mutually_exclusive_group(required=True)
-                    group.add_argument(f'--{param.name}',
+                    group.add_argument(f'--{param.name}', type=str,
                         help=f'Required. Can also be specified with positional arg {param.name}.')
-                    group.add_argument(param.name, nargs='?',
+                    group.add_argument(param.name, nargs='?', type=str,
                         help=f'Required. Can also be specified with --{param.name}.')
-                    # parser.add_argument(param.name, f'--{param.name}')
                 elif param.kind == param.VAR_POSITIONAL:
                     # Vararg (*args) param. There will only ever be one of these
                     # it will be at the end of the positional args.
