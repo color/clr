@@ -158,7 +158,7 @@ class Namespace:
                 args.append(value)
             elif param.kind == param.VAR_POSITIONAL:
                 args.extend(value)
-            elif param.kind in (param.KEYWORD_ONLY, ):
+            elif param.kind == param.KEYWORD_ONLY:
                 if param.default != param.empty and value is None:
                     # BoundArguments will apply the defaults.
                     continue
@@ -234,8 +234,8 @@ class Namespace:
             add_help=False,
             formatter_class=argparse.RawDescriptionHelpFormatter)
 
-        # Track whether there is a var positional/vararg/*args parameter. If so, subsequent optional
-        # args should not be allowed positionally.
+        # Track whether there is a var positional/vararg/*args parameter. If so, less flexibility on
+        # positional vs named.
         has_var_positional = any(p.kind == p.VAR_POSITIONAL for p in parameters)
 
         # Add argument(s) to the parser for each param in the cmd signature.
