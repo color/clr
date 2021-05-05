@@ -332,17 +332,19 @@ class System:
         print('\n'.join(r for r in results if r.startswith(query)), end='')
 
     def cmd_completion2(self, command_name, partial='', bools_only=False):
-        """Completion results for arguments."""
+        """Completion results for arguments.
+
+        Optionally only prints out the boolean flags."""
 
         namespace_key, command_name = resolve_command(command_name, cache=self.cache)
         namespace = self.cache.get(namespace_key)
         parser = namespace.argument_parser(command_name)
-        # argparse doesn't support any introspection. Reach into they guts and
-        # pull out the bits we need. This isn't perfect, but their internal api
-        # has been stable for years and the worst thing that can break is shell
-        # completion. Existing off the shelf solutions like argcomplete work by
-        # monkey patching argparse before you build your parsers which is even
-        # more brittle.
+        # argparse doesn't officially support any introspection. Reach into the
+        # guts and pull out the bits we need. This isn't perfect, but their
+        # internal api has been stable for years and the worst thing that can
+        # break is shell completion. Existing off the shelf solutions like the
+        # argcomplete package work by monkey-patching argparse before you build
+        # your parsers which is potentially even more brittle.
 
         options = []
         for action in parser._actions:
@@ -357,12 +359,6 @@ class System:
     def cmd_argtest(self, a, b, c=4, d=None, e=False):
         """For testing arg parsing."""
         print(a, b, c, d, e)
-
-    def cmd_usage(self, query):
-        namespace_key, command_name = resolve_command(query, cache=self.cache)
-        namespace = self.cache.get(namespace_key)
-        parser = namespace.argument_parser(command_name)
-        print(parser.format_usage())
 
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
