@@ -105,10 +105,11 @@ class NoneIgnoringArgparseDestination(argparse.Namespace):
     """argparse destination namespace that ignores attributes changed to None.
 
     In order to allow arguments to be specified as positional or named (--a A) we add two mutally
-    # exlusive arguments with the same dest. The positional one has nargs=? which means when it is
+    exlusive arguments with the same dest. The positional one has nargs=? which means when it is
     left out it will always set None. In practice there is no way to explicitly and purposfully set
     an argument to None, so we simply ignore attempts to set an attribute to None if is currently
-    has a value.
+    has a value. We are relying on the callable's Signature's BoundArguments to apply defaults, not
+    argparse.
     """
     def __setattr__(self, attr, value):
         if value is not None:
@@ -116,6 +117,7 @@ class NoneIgnoringArgparseDestination(argparse.Namespace):
 
 @dataclass
 class Namespace:
+    """clr command namespace."""
     key: str
     descr: str
     longdescr: str
@@ -136,26 +138,26 @@ class Namespace:
         parsed = NoneIgnoringArgparseDestination()
         self.argument_parser(command_name).parse_args(sys.argv[2:], namespace=parsed)
 
-        # Turn parsed args namespace into callable bindable args.
-        cmd_args = []
-        cmd_kwargs = {}
+        # Turn parsed args into somethign we can pass to signature.bind.
+        args = []
+        kwargs = {}
         for param in signature.parameters.values():
             value = getattr(parsed, param.name, None)
             if param.kind  == param.POSITIONAL_ONLY:
-                cmd_args.append(value)
+                args.append(value)
             elif param.kind == param.VAR_POSITIONAL:
-                cmd_args.extend(value)
+                args.extend(value)
             elif param.kind in (param.KEYWORD_ONLY, param.POSITIONAL_OR_KEYWORD):
                 if param.default != param.empty and value is None:
                     # BoundArguments will apply the defaults.
                     continue
-                cmd_kwargs[param.name] = value
+                kwargs[param.name] = value
 
-        # Ensure the signature is valid. Could be skipped, but adds correctness and
-        # gives a nice error message when something is wrong.
-        bound = signature.bind(*cmd_args, **cmd_kwargs)
-        bound.apply_defaults()
-        return bound
+        # Ensure the signature is valid and applies default. Could use argparse to do more of this,
+        # but adds correctness guarantees and gives a nice error message when something is wrong.
+        bound_args = signature.bind(*args, **kwargs)
+        bound_args.apply_defaults()
+        return bound_args
 
     def argument_parser(self, command_name):
         """Returns an ArgumentParser matching the signature of command.
