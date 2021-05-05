@@ -119,7 +119,7 @@ class NoneIgnoringArgparseDestination(argparse.Namespace):
         if value is not None:
             super().__setattr__(attr, value)
 
-@dataclass
+@dataclass(frozen=True)
 class CommandSpec:
     """Pickle-able specification of a command."""
     docstr: str
@@ -148,16 +148,17 @@ class Namespace:
         parsed = NoneIgnoringArgparseDestination()
         self.argument_parser(command_name).parse_args(sys.argv[2:], namespace=parsed)
 
-        # Turn parsed args into something we can pass to signature.bind.
+        # Turn parsed args into something we can pass to signature.bind. If POSITIONAL_OR_KEYWORD
+        # include the value positionally so that VAR_POSITIONAL works correctly.
         args = []
         kwargs = {}
         for param in signature.parameters.values():
             value = getattr(parsed, param.name, None)
-            if param.kind  == param.POSITIONAL_ONLY:
+            if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
                 args.append(value)
             elif param.kind == param.VAR_POSITIONAL:
                 args.extend(value)
-            elif param.kind in (param.KEYWORD_ONLY, param.POSITIONAL_OR_KEYWORD):
+            elif param.kind in (param.KEYWORD_ONLY, ):
                 if param.default != param.empty and value is None:
                     # BoundArguments will apply the defaults.
                     continue
@@ -175,68 +176,129 @@ class Namespace:
         Defaults are not specified in the parser spec because they are applied via the signature
         binding.
 
-        General scheme for is
-        - All
+        General approach is to allow as much flexibility for how arguements are specificied as
+        possible while maintaining 100% compatibility with legacy arg parsing (if it used to work it
+        should continue to work). The original approach had a stricter seperation between positional
+        and named arguements- optional arguements could still be given positionally, but required
+        ones had to be positional. The new approach is compatible with old incantations, but also
+        allows all arguments to be specified with named flags (--arg ARG). Just like in calling
+        methods in code, using all positional arguments is more concise, but when dealing with more
+        than a few it can become less clear what is going on. Additionally using named flags is more
+        discoverable when using shell completion.
+
+        - Arguments are considered required if they don't have a default value.
+        - Required arguments can be specified either positionally or named. Exactly one usage must
+          be present.
+        - If the n-th positional argument is specified with a named flag, all subsequent ones must
+          as well.
+        - Varargs (*arg) parameters are a special case, must be used positionally, and can be be
+          empty list.
+        - Optional (has a default) parameters can also be specified either way, however can also be
+          left out.
+        - All arguments are assumed to be strings unless they specify a default with another type.
+          Only str, bool, int and float are supported. If a default of that type is specified,
+          arguments are cast to that type before calling.
+        - Boolean parameters (to be boolean means they specify a default so they are also optional)
+          get special handling and both --arg and --noarg flags that don't take a value are make
+          avaliable.
+        - If there is a vararg, required args can only be specified positionally and optional args
+          can not be specified positionall.y
+
+        Taking the system:argtest command as an example:
+        def cmd_argtest(self, a, b, c=4, d=None, e=False)
+
+        These are valid usages:
+        clr argtest 1 2
+        clr argtest 1 --b 2
+        clr argtest 1 --b=2
+        clr argtest 1 2 3
+        clr argtest 1 2 3 4
+        clr argtest 1 2 --e
+        clr argtest --a=1 --b=2
+        clr argtest --a=1 --b=2 --e
+        clr argtest --a=1 --b=2 --noe
+        clr argtest --e --d=6 --a=1 --b=2
+        clr argtest --a=1 --b=2 --c=3 --d=4 --e
+
+        These are invalid usages:
+        clr argtest 1 --a=2 (a specified twice, b missing)
+        clr argtest 1 2 --a=3 (a specified twice)
+        clr argtest 1 2 --e --noe (e and noe are mutually exclusive)
+        clr argtest 1 2 --c=a (c must be an int)
         """
         spec = self.command_specs[command_name]
+        parameters = spec.signature.parameters.values()
         parser = argparse.ArgumentParser(
             prog=f'clr {self.key}:{command_name}',
             description=spec.docstr,
             add_help=False,
             formatter_class=argparse.RawDescriptionHelpFormatter)
 
-        # Add argument(s) to the parser for each param in the cmd signature.
-        for param in spec.signature.parameters.values():
-            positional = param.default == Signature.empty
+        # Track whether there is a var positional/vararg/*args parameter. If so, subsequent optional
+        # args should not be allowed positionally.
+        has_var_positional = any(p.kind == p.VAR_POSITIONAL for p in parameters)
 
-            if positional:
+        # Add argument(s) to the parser for each param in the cmd signature.
+        for param in parameters:
+            name = param.name
+            required = param.default == Signature.empty
+
+            if required:
+                print(name, param.kind)
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
-                    # Standard positional param without a default. Allow to be added as a positional
-                    # OR named arg. One must be specified.
-                    group = parser.add_mutually_exclusive_group(required=True)
-                    group.add_argument(f'--{param.name}', type=str,
-                        help=f'Required. Can also be specified with positional arg {param.name}.')
-                    group.add_argument(param.name, nargs='?', type=str,
-                        help=f'Required. Can also be specified with --{param.name}.')
+                    if has_var_positional:
+                        parser.add_argument(name, type=str, help=f'Required.')
+                    else:
+                        # Standard positional param without a default. Allow to be added as a positional
+                        # OR named arg. One must be specified.
+                        group = parser.add_mutually_exclusive_group(required=True)
+                        group.add_argument(f'--{name}', type=str,
+                            help=f'Required. Can also be specified with positional arg {name}.')
+                        group.add_argument(name, nargs='?', type=str,
+                            help=f'Required. Can also be specified with --{name}.')
                 elif param.kind == param.VAR_POSITIONAL:
                     # Vararg (*args) param. There will only ever be one of these
                     # it will be at the end of the positional args.
-                    parser.add_argument(param.name, type=str, nargs='*')
+                    parser.add_argument(name, type=str, nargs='*')
                 else:
-                    raise AssertionError(f'Unexpected kind of positional param {param.name} in '
+                    raise AssertionError(f'Unexpected kind of positional param {name} in '
                                          f'{command_name}: {repr(param.kind)}')
             else:
                 # Args with defaults can be refered to by name and are optional.
 
                 # No support for kwargs.
                 if param.kind not in (param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY):
-                    raise AssertionError(f'Unexpected kwarg **{param.name} in {command_name}.')
+                    raise AssertionError(f'Unexpected kwarg **{name} in {command_name}.')
 
                 # Assume string type for most args.
                 default_type = str
                 if param.default is not None:
                     default_type = type(param.default)
                 if default_type not in (str, bool, int, float):
-                    raise AssertionError(f'Unexpected arg type for {param.name} in {command_name}: '
+                    raise AssertionError(f'Unexpected arg type for {name} in {command_name}: '
                                          f'{default_type}')
 
                 # Put the default in the help text to clarify behavior when it is not specified.
-                help_text = f"Optional. Defaults to {param.name}='{param.default}'."
+                help_text = f"Optional. Defaults to {name}='{param.default}'."
 
                 if default_type == bool:
                     # Add both the --arg and --noarg options, but make them mutally exclusive.
                     group = parser.add_mutually_exclusive_group()
-                    group.add_argument(f'--{param.name}', action='store_true', help=help_text)
-                    group.add_argument(f'--no{param.name}', dest=param.name, action='store_false',
-                        help=help_text)
+                    group.add_argument(f'--{name}', action='store_true',
+                        help=f'{help_text} Inverse of --no{name}.')
+                    group.add_argument(f'--no{name}', dest=name, action='store_false',
+                        help=f'{help_text} Inverse of --{name}.')
                 else:
-                    # Add both as optional (nargs=?) positional and named (--arg) for flexibility.
-                    # Mutually exclusive and have the same dest.
-                    group = parser.add_mutually_exclusive_group()
-                    group.add_argument(param.name, nargs='?', type=default_type,
-                        help=f'{help_text} Can also be specified with --{param.name}.')
-                    group.add_argument(f'--{param.name}', type=default_type,
-                        help=f'{help_text} Can also be specified with positional arg {param.name}.')
+                    if has_var_positional:
+                        parser.add_argument(f'--{name}', type=default_type, help=help_text)
+                    else:
+                        # Add both as optional (nargs=?) positional and named (--arg) for
+                        # flexibility. Mutually exclusive and have the same dest.
+                        group = parser.add_mutually_exclusive_group()
+                        group.add_argument(name, nargs='?', type=default_type,
+                            help=f'{help_text} Can also be specified with --{name}.')
+                        group.add_argument(f'--{name}', type=default_type,
+                            help=f'{help_text} Can also be specified with positional arg {name}.')
         return parser
 
 
@@ -372,6 +434,10 @@ class System:
         """For testing arg parsing."""
         print(f'a={a} b={b} c={c} d={d} e={e}')
 
+    def cmd_argtest2(self, a, b, *c, d=4, e=None, f=False):
+        """For testing arg parsing."""
+        print(f'a={a} b={b} c={c} d={d} e={e} f={f}')
+
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
         if not namespaces:
@@ -427,3 +493,6 @@ class System:
         except BrokenPipeError:
             # Less noisy if help is piped to `head`, etc.
             pass
+
+    def cmd_stuff(self, hostname, *, count=5):
+        print(f'hostname={hostname} count={count}')
