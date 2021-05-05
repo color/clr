@@ -12,7 +12,6 @@ import time
 from collections import namedtuple
 from typing import Dict, Callable, Any
 import argparse
-import itertools
 
 import clr.config
 

@@ -1,6 +1,5 @@
 import sys
 from clr.commands import resolve_command, get_namespace
-import argparse
 
 def main():
     query = 'system:help'
