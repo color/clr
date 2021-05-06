@@ -1,8 +1,9 @@
 import sys
 from clr.commands import resolve_command, get_namespace
 
+
 def main():
-    query = 'system:help'
+    query = "system:help"
     if len(sys.argv) > 1:
         query = sys.argv[1]
 

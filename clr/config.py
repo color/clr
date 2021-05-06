@@ -8,7 +8,8 @@ import os.path
 import os
 import runpy
 
-def find_clrfile(name='clrfile.py'):
+
+def find_clrfile(name="clrfile.py"):
     """Scan for `clrfile.py` defining clr command namespaces.
 
     Searches from cwd and then up the tree. Also looks in $COLOR_ROOT if set.
@@ -19,14 +20,15 @@ def find_clrfile(name='clrfile.py'):
     """
     search_paths = []
     search_paths.extend(Path(os.getcwd()).parents)
-    if 'COLOR_ROOT' in os.environ:
-        search_paths.append(Path(os.environ['COLOR_ROOT']))
+    if "COLOR_ROOT" in os.environ:
+        search_paths.append(Path(os.environ["COLOR_ROOT"]))
 
     for search_path in search_paths:
         file_path = search_path / name
         if file_path.exists():
             return file_path
     raise Exception(f"{name} could not be located. Searched in {search_paths}")
+
 
 def read_namespaces():
     """Returns a mapping from namespace keys to python module paths.
@@ -36,4 +38,4 @@ def read_namespaces():
     'commands'. The values of this mapping are python module names that *are* on
     the PYTHONPATH and can be imported with importlib.import_module.
     """
-    return runpy.run_path(find_clrfile())['commands']
+    return runpy.run_path(find_clrfile())["commands"]

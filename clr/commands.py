@@ -17,15 +17,16 @@ import clr.config
 
 NAMESPACE_MODULE_PATHS = clr.config.read_namespaces()
 # Sorted list of command namespace keys.
-NAMESPACE_KEYS = sorted({'system', *NAMESPACE_MODULE_PATHS.keys()})
+NAMESPACE_KEYS = sorted({"system", *NAMESPACE_MODULE_PATHS.keys()})
 
 # Load lazily namespace modules as needed. Some have expensive/occasionally
 # failing initialization.
 __NAMESPACES = {}
 
+
 def _load_namespace(key):
     """Imports a namespace module."""
-    if key == 'system':
+    if key == "system":
         # Defined at end of file.
         instance = System()
     else:
@@ -37,11 +38,11 @@ def _load_namespace(key):
         instance = module.COMMANDS
     descr = instance.descr
     # Prefer doc string, otherwise explicit .longdescr, otherwise .descr
-    longdescr = inspect.getdoc(instance) or getattr(instance, 'longdescr', descr)
+    longdescr = inspect.getdoc(instance) or getattr(instance, "longdescr", descr)
     command_callables = {
         attribute_name[4:]: getattr(instance, attribute_name)
         for attribute_name in dir(instance)
-        if attribute_name.startswith('cmd_')
+        if attribute_name.startswith("cmd_")
     }
     # Build CommandSpecs for each command. These contain metadata about the
     # command and its args. These are kept in a seperate dataclass from the
@@ -50,13 +51,20 @@ def _load_namespace(key):
     for command_name, command_callable in command_callables.items():
         docstr = inspect.getdoc(command_callable)
         if docstr is None:
-            docstr = ''
+            docstr = ""
         command_specs[command_name] = CommandSpec(
-            docstr,
-            Signature.from_callable(command_callable))
+            docstr, Signature.from_callable(command_callable)
+        )
 
-    return Namespace(key=key, descr=descr, longdescr=longdescr, command_specs=command_specs,
-        command_callables=command_callables, instance=instance)
+    return Namespace(
+        key=key,
+        descr=descr,
+        longdescr=longdescr,
+        command_specs=command_specs,
+        command_callables=command_callables,
+        instance=instance,
+    )
+
 
 def get_namespace(namespace_key):
     """Lazily load and return a namespace"""
@@ -65,45 +73,56 @@ def get_namespace(namespace_key):
         __NAMESPACES[namespace_key] = _load_namespace(namespace_key)
     return __NAMESPACES[namespace_key]
 
+
 def _get_close_matches(query, options):
     """Utility function for making suggests when `resolve_command` can't resolve a namespace/command
     name."""
-    matches = difflib.get_close_matches(query, options, cutoff=.4)
+    matches = difflib.get_close_matches(query, options, cutoff=0.4)
     if query:
-        matches.extend(sorted(o for o in options if o.startswith(query) and o not in matches))
+        matches.extend(
+            sorted(o for o in options if o.startswith(query) and o not in matches)
+        )
     return matches
+
 
 def resolve_command(query, cache=None):
     """Resolve the string `query' into a (namespace_key, command_name) tuple."""
 
-    if ':' in query:
-        namespace_key, command_name = query.split(':', 1)
+    if ":" in query:
+        namespace_key, command_name = query.split(":", 1)
     else:
-        if query in get_namespace('system').commands:
+        if query in get_namespace("system").commands:
             # System commands can be referred to w/o a namespace so that `clr help` works as
             # expected.
-            namespace_key = 'system'
+            namespace_key = "system"
             command_name = query
         else:
             # This will still fail, but the error messages will be sensible.
             namespace_key = query
-            command_name = ''
+            command_name = ""
 
     if namespace_key not in NAMESPACE_KEYS:
-        print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: "
-              f"{_get_close_matches(namespace_key, NAMESPACE_KEYS)}\n\nAvailable namespaces: "
-              f"{NAMESPACE_KEYS}", file=sys.stderr)
+        print(
+            f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: "
+            f"{_get_close_matches(namespace_key, NAMESPACE_KEYS)}\n\nAvailable namespaces: "
+            f"{NAMESPACE_KEYS}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     namespace = cache.get(namespace_key) if cache else get_namespace(namespace_key)
     if command_name not in namespace.commands:
-        print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - "
-              f"{namespace.descr}.\nClosest matches: "
-              f"{_get_close_matches(command_name, namespace.commands)}\n\nAvailable commands: "
-              f"{namespace.commands}\nSee `clr help {namespace_key}` for details.", file=sys.stderr)
+        print(
+            f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - "
+            f"{namespace.descr}.\nClosest matches: "
+            f"{_get_close_matches(command_name, namespace.commands)}\n\nAvailable commands: "
+            f"{namespace.commands}\nSee `clr help {namespace_key}` for details.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     return namespace_key, command_name
+
 
 class NoneIgnoringArgparseDestination(argparse.Namespace):
     """argparse destination namespace that ignores attributes changed to None.
@@ -115,19 +134,24 @@ class NoneIgnoringArgparseDestination(argparse.Namespace):
     has a value. We are relying on the callable's Signature's BoundArguments to apply defaults, not
     argparse.
     """
+
     def __setattr__(self, attr, value):
         if value is not None:
             super().__setattr__(attr, value)
 
+
 @dataclass(frozen=True)
 class CommandSpec:
     """Pickle-able specification of a command."""
+
     docstr: str
     signature: Signature
+
 
 @dataclass
 class Namespace:
     """clr command namespace."""
+
     key: str
     descr: str
     longdescr: str
@@ -229,10 +253,11 @@ class Namespace:
         spec = self.command_specs[command_name]
         parameters = spec.signature.parameters.values()
         parser = argparse.ArgumentParser(
-            prog=f'clr {self.key}:{command_name}',
+            prog=f"clr {self.key}:{command_name}",
             description=spec.docstr,
             add_help=False,
-            formatter_class=argparse.RawDescriptionHelpFormatter)
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
 
         # Track whether there is a var positional/vararg/*args parameter. If so, less flexibility on
         # positional vs named.
@@ -246,36 +271,49 @@ class Namespace:
             if required:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
                     if has_var_positional:
-                        parser.add_argument(name, type=str, help=f'Required.')
+                        parser.add_argument(name, type=str, help=f"Required.")
                     else:
                         # Standard positional param without a default. Allow to be added as a positional
                         # OR named arg. One must be specified.
                         group = parser.add_mutually_exclusive_group(required=True)
-                        group.add_argument(f'--{name}', type=str,
-                            help=f'Required. Can also be specified with positional arg {name}.')
-                        group.add_argument(name, nargs='?', type=str,
-                            help=f'Required. Can also be specified with --{name}.')
+                        group.add_argument(
+                            f"--{name}",
+                            type=str,
+                            help=f"Required. Can also be specified with positional arg {name}.",
+                        )
+                        group.add_argument(
+                            name,
+                            nargs="?",
+                            type=str,
+                            help=f"Required. Can also be specified with --{name}.",
+                        )
                 elif param.kind == param.VAR_POSITIONAL:
                     # Vararg (*args) param. There will only ever be one of these
                     # it will be at the end of the positional args.
-                    parser.add_argument(name, type=str, nargs='*')
+                    parser.add_argument(name, type=str, nargs="*")
                 else:
-                    raise AssertionError(f'Unexpected kind of positional param {name} in '
-                                         f'{command_name}: {repr(param.kind)}')
+                    raise AssertionError(
+                        f"Unexpected kind of positional param {name} in "
+                        f"{command_name}: {repr(param.kind)}"
+                    )
             else:
                 # Args with defaults can be refered to by name and are optional.
 
                 # No support for kwargs.
                 if param.kind not in (param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY):
-                    raise AssertionError(f'Unexpected kwarg **{name} in {command_name}.')
+                    raise AssertionError(
+                        f"Unexpected kwarg **{name} in {command_name}."
+                    )
 
                 # Assume string type for most args.
                 default_type = str
                 if param.default is not None:
                     default_type = type(param.default)
                 if default_type not in (str, bool, int, float):
-                    raise AssertionError(f'Unexpected arg type for {name} in {command_name}: '
-                                         f'{default_type}')
+                    raise AssertionError(
+                        f"Unexpected arg type for {name} in {command_name}: "
+                        f"{default_type}"
+                    )
 
                 # Put the default in the help text to clarify behavior when it is not specified.
                 help_text = f"Optional. Defaults to {name}='{param.default}'."
@@ -283,27 +321,44 @@ class Namespace:
                 if default_type == bool:
                     # Add both the --arg and --noarg options, but make them mutally exclusive.
                     group = parser.add_mutually_exclusive_group()
-                    group.add_argument(f'--{name}', action='store_true',
-                        help=f'{help_text} Inverse of --no{name}.')
-                    group.add_argument(f'--no{name}', dest=name, action='store_false',
-                        help=f'{help_text} Inverse of --{name}.')
+                    group.add_argument(
+                        f"--{name}",
+                        action="store_true",
+                        help=f"{help_text} Inverse of --no{name}.",
+                    )
+                    group.add_argument(
+                        f"--no{name}",
+                        dest=name,
+                        action="store_false",
+                        help=f"{help_text} Inverse of --{name}.",
+                    )
                 else:
                     if has_var_positional:
-                        parser.add_argument(f'--{name}', type=default_type, help=help_text)
+                        parser.add_argument(
+                            f"--{name}", type=default_type, help=help_text
+                        )
                     else:
                         # Add both as optional (nargs=?) positional and named (--arg) for
                         # flexibility. Mutually exclusive and have the same dest.
                         group = parser.add_mutually_exclusive_group()
-                        group.add_argument(name, nargs='?', type=default_type,
-                            help=f'{help_text} Can also be specified with --{name}.')
-                        group.add_argument(f'--{name}', type=default_type,
-                            help=f'{help_text} Can also be specified with positional arg {name}.')
+                        group.add_argument(
+                            name,
+                            nargs="?",
+                            type=default_type,
+                            help=f"{help_text} Can also be specified with --{name}.",
+                        )
+                        group.add_argument(
+                            f"--{name}",
+                            type=default_type,
+                            help=f"{help_text} Can also be specified with positional arg {name}.",
+                        )
         return parser
 
 
 @dataclass
 class ErrorLoadingNamespace:
     """Psuedo namespace for when one can't be loaded to show the error message in `clr help`."""
+
     key: str
     error: Exception
 
@@ -321,12 +376,16 @@ class ErrorLoadingNamespace:
 
     @property
     def longdescr(self):
-        return (f"Error importing module '{NAMESPACE_MODULE_PATHS[self.key]}' for namespace "
-                f"'{self.key}':\n\n{self.error}")
+        return (
+            f"Error importing module '{NAMESPACE_MODULE_PATHS[self.key]}' for namespace "
+            f"'{self.key}':\n\n{self.error}"
+        )
+
 
 @dataclass(frozen=True)
 class NamespaceCacheEntry:
     """Picke-able subset of Namespace for NamespaceCache."""
+
     key: str
     descr: str
     longdescr: str
@@ -334,11 +393,15 @@ class NamespaceCacheEntry:
 
     @staticmethod
     def create(namespace):
-        return NamespaceCacheEntry(namespace.key, namespace.descr,
-            namespace.longdescr, namespace.command_specs)
+        return NamespaceCacheEntry(
+            namespace.key, namespace.descr, namespace.longdescr, namespace.command_specs
+        )
+
+
 # Steal some functionality.
 NamespaceCacheEntry.commands = Namespace.commands
 NamespaceCacheEntry.argument_parser = Namespace.argument_parser
+
 
 class NamespaceCache:
     """Cache introspection on command names and signatures to disk.
@@ -349,16 +412,16 @@ class NamespaceCache:
     """
 
     def __init__(self):
-        tmpdir = os.environ.get('TMPDIR', '/tmp')
-        self.cache_fn = os.path.join(tmpdir, 'clr_command_cache')
+        tmpdir = os.environ.get("TMPDIR", "/tmp")
+        self.cache_fn = os.path.join(tmpdir, "clr_command_cache")
         # Clr processes are short lived. We don't close the shelve, but are
         # careful to sync it after writes.
         self.cache = shelve.open(self.cache_fn)
 
     def get(self, namespace_key):
         # Don't cache the system namespace. It is already loaded.
-        if namespace_key == 'system':
-            return get_namespace('system')
+        if namespace_key == "system":
+            return get_namespace("system")
         # Load namespace and save spec to the shelve.
         if namespace_key not in self.cache:
             namespace = get_namespace(namespace_key)
@@ -368,6 +431,7 @@ class NamespaceCache:
             self.cache.sync()
         return self.cache[namespace_key]
 
+
 class System:
     """Namespace for system commands in the clr tool.
 
@@ -376,7 +440,7 @@ class System:
     not to define commands here that have the same name as a defined namespace
     or it may be obscured."""
 
-    descr = 'clr built-in commands'
+    descr = "clr built-in commands"
 
     cache = NamespaceCache()
 
@@ -388,23 +452,23 @@ class System:
         # Remove file. Process exits after this, will get recreated on next run.
         os.remove(self.cache.cache_fn)
 
-    def cmd_completion_command(self, query=''):
+    def cmd_completion_command(self, query=""):
         """Completion results for first arg to clr."""
 
         results = []
-        if ':' not in query:
+        if ":" not in query:
             # Suffix system commands with a space.
-            results.extend(f'{c} ' for c in self.cache.get('system').commands)
+            results.extend(f"{c} " for c in self.cache.get("system").commands)
             # Suffix namespaces with a :.
-            results.extend(f'{k}:' for k in NAMESPACE_KEYS)
+            results.extend(f"{k}:" for k in NAMESPACE_KEYS)
         else:
-            namespace_key, _ = query.split(':', 1)
+            namespace_key, _ = query.split(":", 1)
             namespace = self.cache.get(namespace_key)
-            results.extend(f'{namespace_key}:{c} ' for c in namespace.commands)
+            results.extend(f"{namespace_key}:{c} " for c in namespace.commands)
 
-        print('\n'.join(r for r in results if r.startswith(query)), end='')
+        print("\n".join(r for r in results if r.startswith(query)), end="")
 
-    def cmd_completion_arg(self, command_name, partial='', bools_only=False):
+    def cmd_completion_arg(self, command_name, partial="", bools_only=False):
         """Completion results for arguments.
 
         Optionally only prints out the boolean flags."""
@@ -427,15 +491,15 @@ class System:
 
         # partial is prepended with a space to stop argparse from parsing it
         partial = partial.strip()
-        print('\n'.join(f'{o} ' for o in options if o.startswith(partial)), end='')
+        print("\n".join(f"{o} " for o in options if o.startswith(partial)), end="")
 
     def cmd_argtest(self, a, b, c=4, d=None, e=False):
         """For testing arg parsing."""
-        print(f'a={a} b={b} c={c} d={d} e={e}')
+        print(f"a={a} b={b} c={c} d={d} e={e}")
 
     def cmd_argtest2(self, a, b, *c, d=4, e=None, f=False):
         """For testing arg parsing."""
-        print(f'a={a} b={b} c={c} d={d} e={e} f={f}')
+        print(f"a={a} b={b} c={c} d={d} e={e} f={f}")
 
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
@@ -445,10 +509,14 @@ class System:
         for index, key in enumerate(namespaces):
             start_time = time.time()
             get_namespace(key)
-            results[f'#{index + 1}-{key}'] = time.time() - start_time
+            results[f"#{index + 1}-{key}"] = time.time() - start_time
 
-        print('\n'.join(f'{k}: {int(1000*v)}'
-                        for k, v in sorted(results.items(), key=lambda i:i[1])))
+        print(
+            "\n".join(
+                f"{k}: {int(1000*v)}"
+                for k, v in sorted(results.items(), key=lambda i: i[1])
+            )
+        )
 
     def cmd_help(self, query=None, query2=None):
         """
@@ -465,24 +533,29 @@ class System:
         Prints help for a command.
         """
         if not query:
-            print('Available namespaces')
+            print("Available namespaces")
             for namespace_key in NAMESPACE_KEYS:
-                print(' ', namespace_key.ljust(20), '-', self.cache.get(namespace_key).descr)
+                print(
+                    " ",
+                    namespace_key.ljust(20),
+                    "-",
+                    self.cache.get(namespace_key).descr,
+                )
             return
 
         # If they passed just one arg and it is a namespace key, print help for the full namespace.
-        if query.endswith(':'):
+        if query.endswith(":"):
             query = query[:-1]
         if query in NAMESPACE_KEYS and not query2:
             namespace = self.cache.get(query)
-            print(f'{query} - {namespace.longdescr}\n')
+            print(f"{query} - {namespace.longdescr}\n")
             for command in namespace.commands:
-                print('-' * 80)
+                print("-" * 80)
                 self.print_help_for_command(query, command)
             return
 
         if query2:
-            query = f'{query}:{query2}'
+            query = f"{query}:{query2}"
         namespace_key, command_name = resolve_command(query, cache=self.cache)
         self.print_help_for_command(namespace_key, command_name)
 
@@ -494,4 +567,4 @@ class System:
             pass
 
     def cmd_stuff(self, hostname, *, count=5):
-        print(f'hostname={hostname} count={count}')
+        print(f"hostname={hostname} count={count}")
