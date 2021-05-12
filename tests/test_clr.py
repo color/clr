@@ -23,27 +23,32 @@ def test_argtest(capsys):
     check(['1', '2', '--d=4', '--c=3'], 'a=1 b=2 c=3 d=4 e=False f=True')
     check(['1', '2', '--d=3'], 'a=1 b=2 c=4 d=3 e=False f=True')
     check(['1', '2', '--nof', '--e'], 'a=1 b=2 c=4 d=None e=True f=False')
-    check_failure(['1'], 'Not all non-default arguments were specified!')
-    check_failure(['11', '2', '--c=ccc'], "error: option --c: invalid integer value: 'ccc'")
-
-    # Ideally should work, but doesn't.
-    check_failure(['1', '--b=2'], 'Not all non-default arguments were specified!')
+    check(['1', '2', '--nof', '--noe'], 'a=1 b=2 c=4 d=None e=False f=False')
+    check_failure(['1'], 'one of the arguments --b b is required')
+    check_failure(['11', '2', '--c=ccc'], "error: argument --c: invalid int value: 'ccc'")
+    check(['1', '--b=2'], 'a=1 b=2 c=4 d=None e=False f=True')
+    check(['--a', '1', '--b=2'], 'a=1 b=2 c=4 d=None e=False f=True')
+    check(['--a', 'aaa', '--b', 'bbb', '--c', '333', '--d', 'ddd', '--e', '--nof'],
+        'a=aaa b=bbb c=333 d=ddd e=True f=False')
 
 
 def test_argtest2(capsys):
     def check(args, expected):
         clr.main(['clr', 'argtest2'] + args)
         captured = capsys.readouterr()
-        assert captured.out == f'{expected}\n'
+        assert expected in captured.out
 
     def check_failure(args, expected):
         with pytest.raises(SystemExit):
             clr.main(['clr', 'argtest2'] + args)
         captured = capsys.readouterr()
-        assert captured.err == f'{expected}\n'
+        assert expected in captured.err
 
-    check(['1', '2'], 'a=1 b=2 c=()')
-    check(['11', '2', '3'], "a=11 b=2 c=('3',)")
-    check(['11', '2', '3', '4'], "a=11 b=2 c=('3', '4')")
-    check(['11', '2', '3', '4', 'a', 'b'], "a=11 b=2 c=('3', '4', 'a', 'b')")
-    check_failure(['11'], "Not all non-default arguments were specified!")
+    check(['1', '2'], 'a=1 b=2 c=() d=4 e=None f=False g=')
+    check(['11', '2', '3'], "a=11 b=2 c=('3',) d=4 e=None f=False g=")
+    check(['11', '2', '3', '4'], "a=11 b=2 c=('3', '4') d=4 e=None f=False g=")
+    check(['11', '2', '3', '4', 'a', 'b'], "a=11 b=2 c=('3', '4', 'a', 'b') d=4 e=None f=False g=")
+    check_failure(['11'], "the following arguments are required: b")
+    check(['11', '2', '3', '4', '--f'], "a=11 b=2 c=('3', '4') d=4 e=None f=True g=")
+    check(['11', '2', '3', '4', '--g=ggg', '--e=eee'],
+        "a=11 b=2 c=('3', '4') d=4 e=eee f=False g=ggg")
