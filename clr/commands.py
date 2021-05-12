@@ -581,6 +581,83 @@ class System:
         # Suggest all missing optional args.
         print('\n'.join(f'{o} ' for o in missing_optional_args if o.startswith(current_arg)), end='')
 
+    def cmd_smart_complete(self, *existing_args):
+        """Smart/opinionated completion. Completes the _next_ required arg only if it is missing."""
+
+        if len(existing_args) < 2:
+            # Invalid call.
+            return
+
+        command_name = existing_args[1]
+        existing_args = existing_args[2:]
+
+        # existing_args will contain at least an empty str element if we're past the command name.
+        if not existing_args:
+            self.cmd_completion_command(query=command_name)
+            return
+
+        # Special case for the first/only arg to help.
+        if command_name in ('system:help', 'help') and len(existing_args) < 2:
+            self.cmd_completion_command(query=existing_args[0])
+            return
+
+        current_arg = existing_args[-1]
+        previous_args = existing_args[:-1]
+
+        namespace_key, command_name = resolve_command(command_name, cache=self.cache)
+        parameters = self.cache.get(namespace_key).command_specs[command_name].signature.parameters.values()
+
+        # Will suggest the first missing required arg if there is one.
+        missing_required_args = []
+        # Once all the required args are present, will suggest the optional ones.
+        missing_optional_args = []
+        # Boolean args don't need to be followed by an value.
+        boolean_options = set()
+        # No filename completion for numberical args.
+        numerical_options = set()
+        # Required args don't have named flags if there is a var positional.
+        has_var_positional = False
+        for param in parameters:
+            if param.kind == param.VAR_POSITIONAL:
+                has_var_positional = True
+                continue
+            arg_name = f'--{param.name}'
+            if param.default == Signature.empty:
+                if arg_name not in previous_args:
+                    missing_required_args.append(arg_name)
+                continue
+
+            if type(param.default) == bool:
+                arg_names = [arg_name, f'--no{param.name}']
+                boolean_options.update(arg_names)
+                if not any(a in previous_args for a in arg_names):
+                    missing_optional_args.extend(arg_names)
+                continue
+
+            if type(param.default) in (int, float):
+                numerical_options.add(arg_name)
+
+            if arg_name not in previous_args:
+                missing_optional_args.append(arg_name)
+
+        # If the previous argument is a flag that expects a value argument, return with exit code 2
+        # to indicate to the shell that standard file/dir completion is desired.
+        if (previous_args
+            and previous_args[-1].startswith('--')
+            and previous_args[-1] not in boolean_options):
+            if previous_args[-1] in numerical_options:
+                # No completion.
+                return
+            return 2
+
+        if missing_required_args and not has_var_positional:
+            # Required arg not present. Suggest that only.
+            print(f'{missing_required_args[0]} ', end='')
+            return
+
+        # Suggest all missing optional args.
+        print('\n'.join(f'{o} ' for o in missing_optional_args if o.startswith(current_arg)), end='')
+
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
         if not namespaces:
