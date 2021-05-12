@@ -42,5 +42,6 @@ def read_namespaces():
     the PYTHONPATH and can be imported with importlib.import_module.
     """
     clrfile = find_clrfile()
-    if not clrfile: return {}
+    if not clrfile:
+        return {}
     return runpy.run_path(clrfile)['commands']
