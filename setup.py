@@ -1,5 +1,8 @@
 from setuptools import setup
 
+requirements = [
+  "dataclasses==0.8;python_version<'3.7'"
+]
 setup(name = "clr",
       version = "0.2.0",
       description = "A command line tool for executing custom python scripts.",
@@ -10,11 +13,9 @@ setup(name = "clr",
       entry_points = {
         "console_scripts": [ "clr = clr:main" ],
       },
-      install_requires=[
-        "dataclasses"
-      ],
+      install_requires=requirements,
       setup_requires=['pytest-runner'],
-      tests_require=['pytest'],
+      tests_require=requirements + ['pytest==6.2.4'],
       license = "MIT",
       include_package_data=True,
       package_data={
