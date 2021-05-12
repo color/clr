@@ -273,7 +273,10 @@ class System:
         self.print_help_for_command(namespace_key, command_name)
 
     def print_help_for_command(self, namespace_key, command_name, prefix=''):
-        width = os.get_terminal_size().columns
+        try:
+            width = os.get_terminal_size().columns
+        except OSError:
+            width = 80
         text_wrapper = textwrap.TextWrapper(
             initial_indent=prefix, subsequent_indent=prefix, width=width)
 
@@ -310,6 +313,10 @@ class System:
             for line in docstr.split('\n'):
                 print(text_wrapper.fill(line))
 
-    def cmd_argtest(self, a, b, c=4, d=None, e=False):
+    def cmd_argtest(self, a, b, c=4, d=None, e=False, g=True):
         """For testing arg parsing."""
-        print(a, b, c, d, e)
+        print(f'a={a} b={b} c={c} d={d} e={e} g={g}')
+
+    def cmd_argtest2(self, a, b, *c):
+        """For testing arg parsing."""
+        print(f'a={a} b={b} c={c}')

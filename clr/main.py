@@ -7,8 +7,9 @@ from clr.commands import get_command_spec, resolve_command, get_namespace, NO_DE
 def apply(fn, args, kwargs):
     fn(*args, **kwargs)
 
-def main():
-    argv = sys.argv
+def main(argv = None):
+    if not argv:
+        argv = sys.argv
     parser = optparse.OptionParser(add_help_option=False)
     ghelp = parser.format_option_help()
 

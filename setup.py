@@ -1,9 +1,5 @@
 import os
-
-try:
-  from setuptools import setup
-except:
-  from distutils.core import setup
+from setuptools import setup
 
 
 setup(name = "clr",
@@ -20,5 +16,7 @@ setup(name = "clr",
         "future>=0.16.0",
         "dataclasses"
       ],
+      setup_requires=['pytest-runner'],
+      tests_require=['pytest'],
       license = "MIT",
-      )
+)
