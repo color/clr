@@ -150,7 +150,7 @@ class Namespace:
 
         # Parse the command line arguments, starting after command name.
         parsed = NoneIgnoringArgparseDestination()
-        self.argument_parser(command_name).parse_args(sys.argv[2:], namespace=parsed)
+        self.argument_parser(command_name).parse_args(argv, namespace=parsed)
 
         # Turn parsed args into something we can pass to signature.bind.
         args = []
