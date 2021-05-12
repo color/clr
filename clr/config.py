@@ -9,7 +9,8 @@ import os
 import sys
 import runpy
 
-NAME = 'clrfile.py'
+NAME = "clrfile.py"
+
 
 def find_clrfile():
     """Scan for `clrfile.py` defining clr command namespaces.
@@ -21,19 +22,23 @@ def find_clrfile():
     flexible but harder to reason about.
     """
     search_paths = []
-    cwd =  Path(os.getcwd())
+    cwd = Path(os.getcwd())
     search_paths.append(cwd)
     search_paths.extend(cwd.parents)
-    if 'COLOR_ROOT' in os.environ:
-        search_paths.append(Path(os.environ['COLOR_ROOT']))
+    if "COLOR_ROOT" in os.environ:
+        search_paths.append(Path(os.environ["COLOR_ROOT"]))
 
     for search_path in search_paths:
         file_path = search_path / NAME
         if file_path.exists():
             return file_path
 
-    print(f"WARNING: {NAME} could not be located. Only the `system` namespace will be avaliable."
-        f" Searched in {', '.join(str(p) for p in search_paths)}", file=sys.stderr)
+    print(
+        f"WARNING: {NAME} could not be located. Only the `system` namespace will be avaliable."
+        f" Searched in {', '.join(str(p) for p in search_paths)}",
+        file=sys.stderr,
+    )
+
 
 def read_namespaces():
     """Returns a mapping from namespace keys to python module paths.
@@ -46,4 +51,4 @@ def read_namespaces():
     clrfile = find_clrfile()
     if not clrfile:
         return {}
-    return runpy.run_path(clrfile)['commands']
+    return runpy.run_path(clrfile)["commands"]

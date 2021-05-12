@@ -21,4 +21,3 @@ setup(name = "clr",
       package_data={
         "": ["completion.*"],
       }
-)
