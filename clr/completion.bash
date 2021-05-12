@@ -60,4 +60,22 @@ _clr_completion()
     return
 }
 
-complete -o nosort  -o nospace -F _clr_completion clr
+_clr_smart_completion()
+{
+    local IFS=$'\n'
+    local prev cur cword words
+    _get_comp_words_by_ref -n : prev cur cword words
+
+    COMPREPLY=( $(clr smart_complete "${words[@]}") )
+
+    if [ $? -eq 2 ]
+    then
+        _filedir
+        return
+    else
+        __ltrim_colon_completions "$cur"
+    fi
+}
+
+# complete -o nosort -o nospace -F _clr_completion clr
+complete -o nosort -o nospace -F _clr_smart_completion clr

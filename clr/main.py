@@ -2,7 +2,7 @@ import sys
 from clr.commands import resolve_command, get_namespace
 
 
-def main(argv=None):
+def main(argv = None):
     if not argv:
         argv = sys.argv
     query = "system:help"
@@ -14,4 +14,11 @@ def main(argv=None):
     bound_args = namespace.parse_args(cmd_name, argv[2:])
 
     # Call the command.
-    namespace.command_callables[cmd_name](*bound_args.args, **bound_args.kwargs)
+    result = namespace.command_callables[cmd_name](
+        *bound_args.args, **bound_args.kwargs
+    )
+    # Support exit codes.
+    if type(result) == int:
+        sys.exit(result)
+    if result:
+        print(f"Result: {result}")
