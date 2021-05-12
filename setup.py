@@ -13,7 +13,6 @@ setup(name = "clr",
         "console_scripts": [ "clr = clr:main" ],
       },
       install_requires=[
-        "future>=0.16.0",
         "dataclasses"
       ],
       setup_requires=['pytest-runner'],
