@@ -12,14 +12,9 @@ import time
 from collections import namedtuple
 from typing import Dict, Callable, Any
 import shutil
+import argparse
 
 import clr.config
-
-# Sentinal for arg defaults in get_command_spec to indicate there is no default.
-# Because we are pickling command specs for clr cache, use a random int and
-# check for equality rather than object identity.
-# TODO(michael.cusack): Move command spec to inspect.Signature and remove this.
-NO_DEFAULT = 4194921784511160246
 
 NAMESPACE_MODULE_PATHS = clr.config.read_namespaces()
 # Sorted list of command namespace keys.
@@ -30,7 +25,7 @@ NAMESPACE_KEYS = sorted({'system', *NAMESPACE_MODULE_PATHS.keys()})
 __NAMESPACES = {}
 
 def _load_namespace(key):
-    """Imports the module specified by the given key."""
+    """Imports a namespace module."""
     if key == 'system':
         # Defined at end of file.
         instance = System()
@@ -42,27 +37,38 @@ def _load_namespace(key):
             return ErrorLoadingNamespace(key, error)
         instance = module.COMMANDS
     descr = instance.descr
-    longdescr = getattr(instance, 'longdescr', descr)
+    # Prefer doc string, otherwise explicit .longdescr, otherwise .descr
+    longdescr = inspect.getdoc(instance) or getattr(instance, 'longdescr', descr)
     command_callables = {
         attribute_name[4:]: getattr(instance, attribute_name)
         for attribute_name in dir(instance)
         if attribute_name.startswith('cmd_')
     }
-    command_specs = {
-        command_name: get_command_spec(command_callable)
-        for command_name, command_callable in command_callables.items()
-    }
-    return Namespace(
-        descr, longdescr, command_specs, command_callables, instance)
+    # Build CommandSpecs for each command. These contain metadata about the
+    # command and its args. These are kept in a seperate dataclass from the
+    # callables because CommandSpec's are pickle-able and cached to disk.
+    command_specs = {}
+    for command_name, command_callable in command_callables.items():
+        docstr = inspect.getdoc(command_callable)
+        if docstr is None:
+            docstr = ''
+        command_specs[command_name] = CommandSpec(
+            docstr,
+            Signature.from_callable(command_callable))
+
+    return Namespace(key=key, descr=descr, longdescr=longdescr, command_specs=command_specs,
+        command_callables=command_callables, instance=instance)
 
 def get_namespace(namespace_key):
-    """Lazily load and return the namespace"""
+    """Lazily load and return a namespace"""
     global __NAMESPACES
     if namespace_key not in __NAMESPACES:
         __NAMESPACES[namespace_key] = _load_namespace(namespace_key)
     return __NAMESPACES[namespace_key]
 
 def _get_close_matches(query, options):
+    """Utility function for making suggests when `resolve_command` can't resolve a namespace/command
+    name."""
     matches = difflib.get_close_matches(query, options, cutoff=.4)
     if query:
         matches.extend(sorted(o for o in options if o.startswith(query) and o not in matches))
@@ -75,7 +81,8 @@ def resolve_command(query, cache=None):
         namespace_key, command_name = query.split(':', 1)
     else:
         if query in get_namespace('system').commands:
-            # So that `clr help` works as expected.
+            # System commands can be referred to w/o a namespace so that `clr help` works as
+            # expected.
             namespace_key = 'system'
             command_name = query
         else:
@@ -84,50 +91,45 @@ def resolve_command(query, cache=None):
             command_name = ''
 
     if namespace_key not in NAMESPACE_KEYS:
-        close_matches = _get_close_matches(namespace_key, NAMESPACE_KEYS)
-        print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: {close_matches}\n\nAvailable namespaces: {sorted(NAMESPACE_KEYS)}", file=sys.stderr)
+        print(f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: "
+              f"{_get_close_matches(namespace_key, NAMESPACE_KEYS)}\n\nAvailable namespaces: "
+              f"{NAMESPACE_KEYS}", file=sys.stderr)
         sys.exit(1)
 
     namespace = cache.get(namespace_key) if cache else get_namespace(namespace_key)
     if command_name not in namespace.commands:
-        close_matches = _get_close_matches(command_name, namespace.commands)
-        print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - {namespace.descr}.\nClosest matches: {close_matches}\n\nAvailable commands: {namespace.commands}", file=sys.stderr)
+        print(f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - "
+              f"{namespace.descr}.\nClosest matches: "
+              f"{_get_close_matches(command_name, namespace.commands)}\n\nAvailable commands: "
+              f"{namespace.commands}\nSee `clr help {namespace_key}` for details.", file=sys.stderr)
         sys.exit(1)
 
     return namespace_key, command_name
 
-CommandSpec = namedtuple('CommandSpec', 'args varargs docstr')
-def get_command_spec(command_callable):
-    """Get a command spec from the given (resolved) command, and
-    distinguish default args vs. non-default args."""
+class NoneIgnoringArgparseDestination(argparse.Namespace):
+    """argparse destination namespace that ignores attributes changed to None.
 
-    # TODO(michael.cusack): Move to using Signature and remove deprecated
-    # getargspec.
-    args, vararg, varkwarg, defvals = inspect.getargspec(command_callable)
-    signature = Signature.from_callable(command_callable)
+    In order to allow arguments to be specified as positional or named (--a A) we add two mutally
+    exlusive arguments with the same dest. The positional one has nargs=? which means when it is
+    left out it will always set None. In practice there is no way to explicitly and purposfully set
+    an argument to None, so we simply ignore attempts to set an attribute to None if is currently
+    has a value. We are relying on the callable's Signature's BoundArguments to apply defaults, not
+    argparse.
+    """
+    def __setattr__(self, attr, value):
+        if value is not None:
+            super().__setattr__(attr, value)
 
-    if signature.return_annotation != Signature.empty:
-        print(f'WARNING: {command_callable} returns a {signature.return_annotation} which is ignored.')
-    for param in signature.parameters.values():
-        if param.kind == param.VAR_KEYWORD:
-            print(f'WARNING: Ignoring kwargs found for clr command {param} {command_callable}: {varkwarg}')
-
-    if args is None:
-        args = tuple()
-    if defvals is None:
-        defvals = tuple()
-
-    # Avoid the self argument.
-    if isinstance(command_callable, types.MethodType):
-        args = args[1:]
-
-    nargs = len(args) - len(defvals)
-    args = list(zip(args[:nargs], [NO_DEFAULT]*nargs)) + list(zip(args[nargs:], defvals))
-    return CommandSpec(args, vararg, inspect.getdoc(command_callable))
-
+@dataclass(frozen=True)
+class CommandSpec:
+    """Pickle-able specification of a command."""
+    docstr: str
+    signature: Signature
 
 @dataclass
 class Namespace:
+    """clr command namespace."""
+    key: str
     descr: str
     longdescr: str
     command_specs: Dict[str, CommandSpec]
@@ -136,18 +138,187 @@ class Namespace:
 
     @property
     def commands(self):
+        """Sorted list of command names in this namespace."""
         return sorted(self.command_specs.keys())
+
+    def parse_args(self, command_name, argv):
+        """Parse args for the given command."""
+
+        signature = self.command_specs[command_name].signature
+        parameters = signature.parameters.values()
+        has_var_positional = any(p.kind == p.VAR_POSITIONAL for p in parameters)
+
+        # Parse the command line arguments, starting after command name.
+        parsed = NoneIgnoringArgparseDestination()
+        self.argument_parser(command_name).parse_args(argv, namespace=parsed)
+
+        # Turn parsed args into something we can pass to signature.bind.
+        args = []
+        kwargs = {}
+
+        # Track whether the current param is before a VAR_POSITIONAL param.
+        before_var_positional = has_var_positional
+
+        for param in parameters:
+            if param.kind == param.VAR_POSITIONAL:
+                args.extend(getattr(parsed, param.name))
+                before_var_positional = False
+            elif before_var_positional:
+                args.append(getattr(parsed, param.name))
+            elif hasattr(parsed, param.name):
+                # BoundArguments will apply the defaults.
+                kwargs[param.name] = getattr(parsed, param.name)
+
+        # Ensure the signature is valid and applies default. Could use argparse to do more of this,
+        # but adds correctness guarantees and gives a nice error message when something is wrong.
+        bound_args = signature.bind(*args, **kwargs)
+        bound_args.apply_defaults()
+        return bound_args
+
+    def argument_parser(self, command_name):
+        """Returns an ArgumentParser matching the signature of command.
+
+        Defaults are not specified in the parser spec because they are applied via the signature
+        binding.
+
+        General approach is to allow as much flexibility for how arguements are specificied as
+        possible while maintaining 100% compatibility with legacy arg parsing (if it used to work it
+        should continue to work). The original approach had a stricter seperation between positional
+        and named arguements- optional arguements could still be given positionally, but required
+        ones had to be positional. The new approach is compatible with old incantations, but also
+        allows all arguments to be specified with named flags (--arg ARG). Just like in calling
+        methods in code, using all positional arguments is more concise, but when dealing with more
+        than a few it can become less clear what is going on. Additionally using named flags is more
+        discoverable when using shell completion.
+
+        - Arguments are considered required if they don't have a default value.
+        - Required arguments can be specified either positionally or named. Exactly one usage must
+          be present.
+        - If the n-th positional argument is specified with a named flag, all subsequent ones must
+          as well.
+        - Varargs (*arg) parameters are a special case, must be used positionally, and can be be
+          empty list.
+        - Optional (has a default) parameters can also be specified either way, however can also be
+          left out.
+        - All arguments are assumed to be strings unless they specify a default with another type.
+          Only str, bool, int and float are supported. If a default of that type is specified,
+          arguments are cast to that type before calling.
+        - Boolean parameters (to be boolean means they specify a default so they are also optional)
+          get special handling and both --arg and --noarg flags that don't take a value are make
+          avaliable.
+        - If there is a vararg, required args can only be specified positionally and optional args
+          can not be specified positionall.y
+
+        Taking the system:argtest command as an example:
+        def cmd_argtest(self, a, b, c=4, d=None, e=False)
+
+        These are valid usages:
+        clr argtest 1 2
+        clr argtest 1 --b 2
+        clr argtest 1 --b=2
+        clr argtest 1 2 3
+        clr argtest 1 2 3 4
+        clr argtest 1 2 --e
+        clr argtest --a=1 --b=2
+        clr argtest --a=1 --b=2 --e
+        clr argtest --a=1 --b=2 --noe
+        clr argtest --e --d=6 --a=1 --b=2
+        clr argtest --a=1 --b=2 --c=3 --d=4 --e
+
+        These are invalid usages:
+        clr argtest 1 --a=2 (a specified twice, b missing)
+        clr argtest 1 2 --a=3 (a specified twice)
+        clr argtest 1 2 --e --noe (e and noe are mutually exclusive)
+        clr argtest 1 2 --c=a (c must be an int)
+        """
+        spec = self.command_specs[command_name]
+        parameters = spec.signature.parameters.values()
+        parser = argparse.ArgumentParser(
+            prog=f'clr {self.key}:{command_name}',
+            description=spec.docstr,
+            add_help=False,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
+
+        # Track whether there is a var positional/vararg/*args parameter. If so, less flexibility on
+        # positional vs named.
+        has_var_positional = any(p.kind == p.VAR_POSITIONAL for p in parameters)
+
+        # Add argument(s) to the parser for each param in the cmd signature.
+        for param in parameters:
+            name = param.name
+            required = param.default == Signature.empty
+
+            if required:
+                if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
+                    if has_var_positional:
+                        parser.add_argument(name, type=str, help=f'Required.')
+                    else:
+                        # Standard positional param without a default. Allow to be added as a positional
+                        # OR named arg. One must be specified.
+                        group = parser.add_mutually_exclusive_group(required=True)
+                        group.add_argument(f'--{name}', type=str,
+                            help=f'Required. Can also be specified with positional arg {name}.')
+                        group.add_argument(name, nargs='?', type=str,
+                            help=f'Required. Can also be specified with --{name}.')
+                elif param.kind == param.VAR_POSITIONAL:
+                    # Vararg (*args) param. There will only ever be one of these
+                    # it will be at the end of the positional args.
+                    parser.add_argument(name, type=str, nargs='*')
+                else:
+                    raise AssertionError(f'Unexpected kind of positional param {name} in '
+                                         f'{command_name}: {repr(param.kind)}')
+            else:
+                # Args with defaults can be refered to by name and are optional.
+
+                # No support for kwargs.
+                if param.kind not in (param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY):
+                    raise AssertionError(f'Unexpected kwarg **{name} in {command_name}.')
+
+                # Assume string type for most args.
+                default_type = str
+                if param.default is not None:
+                    default_type = type(param.default)
+                if default_type not in (str, bool, int, float):
+                    raise AssertionError(f'Unexpected arg type for {name} in {command_name}: '
+                                         f'{default_type}')
+
+                # Put the default in the help text to clarify behavior when it is not specified.
+                help_text = f"Optional. Defaults to {name}='{param.default}'."
+
+                if default_type == bool:
+                    # Add both the --arg and --noarg options, but make them mutally exclusive.
+                    group = parser.add_mutually_exclusive_group()
+                    group.add_argument(f'--{name}', action='store_true', default=None,
+                        help=f'{help_text} Inverse of --no{name}.')
+                    group.add_argument(f'--no{name}', dest=name, action='store_false', default=None,
+                        help=f'{help_text} Inverse of --{name}.')
+                else:
+                    if has_var_positional:
+                        parser.add_argument(f'--{name}', type=default_type, help=help_text)
+                    else:
+                        # Add both as optional (nargs=?) positional and named (--arg) for
+                        # flexibility. Mutually exclusive and have the same dest.
+                        group = parser.add_mutually_exclusive_group()
+                        group.add_argument(name, nargs='?', type=default_type,
+                            help=f'{help_text} Can also be specified with --{name}.')
+                        group.add_argument(f'--{name}', type=default_type,
+                            help=f'{help_text} Can also be specified with positional arg {name}.')
+        return parser
+
 
 @dataclass
 class ErrorLoadingNamespace:
-    """Psuedo namespace for when one can't be loaded to show the error message."""
+    """Psuedo namespace for when one can't be loaded to show the error message in `clr help`."""
     key: str
     error: Exception
 
-    # Satisfy the same properties of a `Namespace`, but never have any actual
-    # commands.
-    commands = frozenset()
-    command_specs = {}
+    @property
+    def commands(self):
+        return tuple()
+
+    @property
+    def command_specs(self):
+        return {}
 
     @property
     def descr(self):
@@ -155,26 +326,29 @@ class ErrorLoadingNamespace:
 
     @property
     def longdescr(self):
-        return f"""Error importing module '{clr.config.commands()[self.key]}' for namespace '{self.key}':\n\n{self.error}"""
+        return (f"Error importing module '{NAMESPACE_MODULE_PATHS[self.key]}' for namespace "
+                f"'{self.key}':\n\n{self.error}")
 
 @dataclass(frozen=True)
 class NamespaceCacheEntry:
+    """Picke-able subset of Namespace for NamespaceCache."""
+    key: str
     descr: str
     longdescr: str
     command_specs: dict
 
     @staticmethod
     def create(namespace):
-        return NamespaceCacheEntry(namespace.descr, namespace.longdescr, namespace.command_specs)
-
-    @property
-    def commands(self):
-        return sorted(self.command_specs.keys())
+        return NamespaceCacheEntry(namespace.key, namespace.descr,
+            namespace.longdescr, namespace.command_specs)
+# Steal some functionality.
+NamespaceCacheEntry.commands = Namespace.commands
+NamespaceCacheEntry.argument_parser = Namespace.argument_parser
 
 class NamespaceCache:
     """Cache introspection on command names and signatures to disk.
 
-    This allows subsequent calls to `clr help` or `clr completion` to be fast.
+    This allows subsequent calls to `clr help` or `clr completion_*` to be fast.
     Necessary to work around the fact that many clr command namespace modules
     import the world and initialize state on import.
     """
@@ -219,7 +393,7 @@ class System:
         # Remove file. Process exits after this, will get recreated on next run.
         os.remove(self.cache.cache_fn)
 
-    def cmd_completion1(self, query=''):
+    def cmd_completion_command(self, query=''):
         """Completion results for first arg to clr."""
 
         results = []
@@ -230,9 +404,29 @@ class System:
             results.extend(f'{k}:' for k in NAMESPACE_KEYS)
         else:
             namespace_key, _ = query.split(':', 1)
-            results.extend(f'{namespace_key}:{c} ' for c in self.cache.get(namespace_key).commands)
+            namespace = self.cache.get(namespace_key)
+            results.extend(f'{namespace_key}:{c} ' for c in namespace.commands)
 
         print('\n'.join(r for r in results if r.startswith(query)), end='')
+
+    def cmd_completion_arg(self, command_name, partial='', bools_only=False):
+        """Completion results for arguments.
+
+        Optionally only prints out the boolean flags."""
+
+        namespace_key, command_name = resolve_command(command_name, cache=self.cache)
+        namespace = self.cache.get(namespace_key)
+
+        options = []
+        for param in namespace.command_specs[command_name].signature.parameters.values():
+            is_bool = type(param.default) == bool
+            if not bools_only or is_bool:
+                options.append(f'--{param.name}')
+            if is_bool:
+                options.append(f'--no{param.name}')
+        # partial is prepended with a space to stop argparse from parsing it
+        partial = partial.strip()
+        print('\n'.join(f'{o} ' for o in options if o.startswith(partial)), end='')
 
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
@@ -249,8 +443,17 @@ class System:
 
     def cmd_help(self, query=None, query2=None):
         """
-        provides help for commands, when specified, `query' can be one
-        either a namespace or a namespace:command tuple.
+        provides help for commands.
+
+        $ clr help
+        Prints all a short description of all namespaces.
+
+        $ clr namespace
+        Prints help for all commands in a namescape.
+
+        $ clr namespace:command
+        $ clr namescape command
+        Prints help for a command.
         """
         if not query:
             print('Available namespaces')
@@ -263,9 +466,12 @@ class System:
             query = query[:-1]
         if query in NAMESPACE_KEYS and not query2:
             namespace = self.cache.get(query)
-            print(query, '-', namespace.longdescr)
+            print(f'{query} - {namespace.longdescr}\n')
             for command in namespace.commands:
-                self.print_help_for_command(query, command, prefix='  ')
+                print(f'  clr {query}:{command}')
+            for command in namespace.commands:
+                print('-' * 80)
+                self.print_help_for_command(query, command)
             return
 
         if query2:
@@ -273,48 +479,18 @@ class System:
         namespace_key, command_name = resolve_command(query, cache=self.cache)
         self.print_help_for_command(namespace_key, command_name)
 
-    def print_help_for_command(self, namespace_key, command_name, prefix=''):
-        width = shutil.get_terminal_size().columns
-        text_wrapper = textwrap.TextWrapper(
-            initial_indent=prefix, subsequent_indent=prefix, width=width)
-
-        spec, vararg, docstr = self.cache.get(namespace_key).command_specs[command_name]
-
-        def is_default(spec):
-            return spec[1] == NO_DEFAULT
-        req = [spec_item for spec_item in spec if is_default(spec_item)]
-        notreq = [spec_item for spec_item in spec if not is_default(spec_item)]
-
-        args = []
-        if len(req) > 0:
-            args.append(' '.join(['<%s>' % a for a, _ in req]))
-
-        if notreq:
-            def arg_text(arg_name, default_value):
-                if isinstance(default_value, bool):
-                    if default_value:
-                        return f'--no{arg_name}'
-                    return f'--{arg_name}'
-                return f'--{arg_name}={default_value}'
-            arg_texts = [arg_text(arg_name, default_value) for arg_name, default_value in notreq]
-            args.append('[%s]' % ' '.join(arg_texts))
-
-        if vararg is not None:
-            args.append('[%s...]' % vararg)
-
-        print(text_wrapper.fill('%s %s' % (command_name, ' '.join(args))))
-
-        text_wrapper.initial_indent += '  '
-        text_wrapper.subsequent_indent += '  '
-
-        if docstr:
-            for line in docstr.split('\n'):
-                print(text_wrapper.fill(line))
+    def print_help_for_command(self, namespace, command):
+        try:
+            self.cache.get(namespace).argument_parser(command).print_help()
+        except BrokenPipeError:
+            # Less noisy if help is piped to `head`, etc.
+            pass
 
     def cmd_argtest(self, a, b, c=4, d=None, e=False, f=True):
         """For testing arg parsing."""
         print(f'a={a} b={b} c={c} d={d} e={e} f={f}')
 
-    def cmd_argtest2(self, a, b, *c):
+    def cmd_argtest2(self, a, b, *c, d=4, e=None, f=False, g=''):
         """For testing arg parsing."""
-        print(f'a={a} b={b} c={c}')
+        print(f'a={a} b={b} c={c} d={d} e={e} f={f} g={g}')
+

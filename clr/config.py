@@ -21,7 +21,9 @@ def find_clrfile():
     flexible but harder to reason about.
     """
     search_paths = []
-    search_paths.extend(Path(os.getcwd()).parents)
+    cwd =  Path(os.getcwd())
+    search_paths.append(cwd)
+    search_paths.extend(cwd.parents)
     if 'COLOR_ROOT' in os.environ:
         search_paths.append(Path(os.environ['COLOR_ROOT']))
 
