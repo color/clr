@@ -1,13 +1,11 @@
-import os
 from setuptools import setup
 
-
 setup(name = "clr",
-      version = "0.1.9",
+      version = "0.2.0",
       description = "A command line tool for executing custom python scripts.",
-      author = "Color Genomics",
+      author = "Color",
       author_email = "dev@getcolor.com",
-      url = "https://github.com/ColorGenomics/clr",
+      url = "https://github.com/color/clr",
       packages = ["clr"],
       entry_points = {
         "console_scripts": [ "clr = clr:main" ],
@@ -18,4 +16,8 @@ setup(name = "clr",
       setup_requires=['pytest-runner'],
       tests_require=['pytest'],
       license = "MIT",
+      include_package_data=True,
+      package_data={
+        "": ["completion.*"],
+      }
 )
