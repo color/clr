@@ -45,3 +45,18 @@ $ clr help
 ```
 $ clr help namespace
 ```
+
+## Development
+* Create a virtualenv and activate it
+```
+python3 -m venv <location>
+source <location>/bin/activate
+```
+* Install this package as editable (symlinked to source files)
+```
+pip install -e .
+```
+* Run the tests
+```
+python setup.py test
+```
