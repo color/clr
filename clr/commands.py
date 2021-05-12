@@ -506,7 +506,7 @@ class System:
         print("\n".join(f"{o} " for o in options if o.startswith(partial)), end="")
 
     def cmd_smart_complete(self, *existing_args):
-        """Smart/opinionated completion. Completes the _next_ required arg only if it is missing."""
+        """Smart/opinionated completion. Completes only the _next_ required arg if it is missing."""
 
         if len(existing_args) < 2:
             # Invalid call.
