@@ -6,10 +6,12 @@ import it to initialize the command list
 from pathlib import Path
 import os.path
 import os
+import sys
 import runpy
 
+NAME = 'clrfile.py'
 
-def find_clrfile(name='clrfile.py'):
+def find_clrfile():
     """Scan for `clrfile.py` defining clr command namespaces.
 
     Searches from cwd and then up the tree. Also looks in $COLOR_ROOT if set.
@@ -24,10 +26,12 @@ def find_clrfile(name='clrfile.py'):
         search_paths.append(Path(os.environ['COLOR_ROOT']))
 
     for search_path in search_paths:
-        file_path = search_path / name
+        file_path = search_path / NAME
         if file_path.exists():
             return file_path
-    raise Exception("%s could not be located. Searched in %s" % (name, search_paths))
+
+    print(f"WARNING: {NAME} could not be located. Only the `system` namespace will be avaliable."
+        f" Searched in {', '.join(str(p) for p in search_paths)}", file=sys.stderr)
 
 def read_namespaces():
     """Returns a mapping from namespace keys to python module paths.
@@ -37,4 +41,7 @@ def read_namespaces():
     'commands'. The values of this mapping are python module names that *are* on
     the PYTHONPATH and can be imported with importlib.import_module.
     """
-    return runpy.run_path(find_clrfile())['commands']
+    clrfile = find_clrfile()
+    if not clrfile:
+        return {}
+    return runpy.run_path(clrfile)['commands']
