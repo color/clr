@@ -10,9 +10,12 @@ _clr () {
     do
         if [[ $s =~ " $" ]]
         then
+            # Ends with a space to indicate a complete arg.
             compadd -U -- "${s: :-1}"
         else
+            # Partial arg, don't append a space.
             compadd -U -S '' -- "${s}"
         fi
     done
 }
+compdef _clr clr

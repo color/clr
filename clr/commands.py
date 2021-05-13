@@ -554,26 +554,21 @@ class System:
             if param.kind == param.VAR_POSITIONAL:
                 has_var_positional = True
                 continue
-            present_positionally = existing_positional_args > param_index
-            arg_name = f"--{param.name}"
-            if param.default == Signature.empty:
-                # Required param.
-                if not present_positionally and arg_name not in previous_args:
-                    missing_required_args.append(arg_name)
-                continue
 
-            # Optional params.
-            arg_names = [arg_name]
+            required = param.default == Signature.empty
+            missing_args = missing_required_args if required else missing_optional_args
+            arg_names = [f"--{param.name}"]
 
             if type(param.default) == bool:
                 arg_names.append(f"--no{param.name}")
                 boolean_options.update(arg_names)
             elif type(param.default) in (int, float):
-                numerical_options.add(arg_name)
+                numerical_options.update(arg_names)
 
+            present_positionally = existing_positional_args > param_index
             present_named = any(a in previous_args for a in arg_names)
             if not present_positionally and not present_named:
-                missing_optional_args.extend(arg_names)
+                missing_args.extend(arg_names)
 
         # If the previous argument is a flag that expects a value argument, return with exit code 2
         # to indicate to the shell that standard file/dir completion is desired.
