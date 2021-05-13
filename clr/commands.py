@@ -595,12 +595,6 @@ class System:
         # Suggest all missing optional args.
         print_for_complete(current_arg, missing_optional_args)
 
-    def print_for_complete(current, options, add_space=True):
-        options = [o for o in options if o.startswith(current)]
-        if add_space:
-            options = [f"{o} " for o in options]
-        print("\n".join(options), end="")
-
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
         if not namespaces:
