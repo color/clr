@@ -9,7 +9,6 @@ _clr_complete()
     if [ $? -eq 2 ]
     then
         _filedir
-        return
     else
         __ltrim_colon_completions "$cur"
     fi
