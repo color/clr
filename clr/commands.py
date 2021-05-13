@@ -13,6 +13,7 @@ from collections import namedtuple
 from typing import Dict, Callable, Any
 import shutil
 import argparse
+import itertools
 
 import clr.config
 
@@ -295,16 +296,12 @@ class Namespace:
                 elif param.kind == param.VAR_POSITIONAL:
                     # Vararg (*args) param. There will only ever be one of these
                     # it will be at the end of the positional args.
-<<<<<<< HEAD
-                    parser.add_argument(name, type=str, nargs="*")
-=======
                     if self.key == 'system' and command_name == 'smart_complete':
                      # Special case to support smart completions.
                         nargs = argparse.REMAINDER
                     else:
                         nargs='*'
                     parser.add_argument(name, type=str, nargs=nargs)
->>>>>>> be smarter about completions
                 else:
                     raise AssertionError(
                         f"Unexpected kind of positional param {name} in "
@@ -468,7 +465,7 @@ class System:
         # Remove file. Process exits after this, will get recreated on next run.
         os.remove(self.cache.cache_fn)
 
-    def cmd_completion_command(self, query=""):
+    def cmd_complete_command(self, query=""):
         """Completion results for first arg to clr."""
 
         results = []
@@ -484,7 +481,7 @@ class System:
 
         print("\n".join(r for r in results if r.startswith(query)), end="")
 
-    def cmd_completion_arg(self, command_name, partial="", bools_only=False):
+    def cmd_complete_arg(self, command_name, partial="", bools_only=False):
         """Completion results for arguments.
 
         Optionally only prints out the boolean flags."""
@@ -517,16 +514,18 @@ class System:
 
         # existing_args will contain at least an empty str element if we're past the command name.
         if not existing_args:
-            self.cmd_completion_command(query=command_name)
+            self.cmd_complete_command(query=command_name)
             return
 
         # Special case for the first/only arg to help.
         if command_name in ('system:help', 'help') and len(existing_args) < 2:
-            self.cmd_completion_command(query=existing_args[0])
+            self.cmd_complete_command(query=existing_args[0])
             return
 
         current_arg = existing_args[-1]
         previous_args = existing_args[:-1]
+
+        existing_positional_args = sum(1 for a in itertools.takewhile(lambda a: not a.startswith('--'), previous_args))
 
         namespace_key, command_name = resolve_command(command_name, cache=self.cache)
         parameters = self.cache.get(namespace_key).command_specs[command_name].signature.parameters.values()
