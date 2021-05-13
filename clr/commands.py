@@ -119,8 +119,8 @@ def resolve_command(query, cache=None):
             f"{namespace.descr}.\nClosest matches: "
             f"{_get_close_matches(command_name, namespace.commands)}\n\nAvailable commands: "
             f"{namespace.commands}\nSee `clr help {namespace_key}` for details.",
+            file=sys.stderr,
         )
-        # file=sys.stderr,
         sys.exit(1)
 
     return namespace_key, command_name
