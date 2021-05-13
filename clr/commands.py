@@ -13,7 +13,7 @@ from collections import namedtuple
 from typing import Dict, Callable, Any
 import shutil
 import argparse
-import itertools
+from itertools import takewhile
 
 import clr.config
 
@@ -105,9 +105,9 @@ def resolve_command(query, cache=None):
 
     if namespace_key not in NAMESPACE_KEYS:
         print(
-            f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: "
-            f"{_get_close_matches(namespace_key, NAMESPACE_KEYS)}\n\nAvailable namespaces: "
-            f"{NAMESPACE_KEYS}",
+            f"Error! Command namespace '{namespace_key}' does not exist.\n"
+            f"Closest matches: {_get_close_matches(namespace_key, NAMESPACE_KEYS)}\n\n"
+            f"Available namespaces: {NAMESPACE_KEYS}",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -119,8 +119,8 @@ def resolve_command(query, cache=None):
             f"{namespace.descr}.\nClosest matches: "
             f"{_get_close_matches(command_name, namespace.commands)}\n\nAvailable commands: "
             f"{namespace.commands}\nSee `clr help {namespace_key}` for details.",
-            file=sys.stderr,
         )
+        # file=sys.stderr,
         sys.exit(1)
 
     return namespace_key, command_name
@@ -525,12 +525,10 @@ class System:
         current_arg = existing_args[-1]
         previous_args = existing_args[:-1]
 
-        existing_positional_args = sum(
-            1
-            for a in itertools.takewhile(
-                lambda a: not a.startswith("--"), previous_args
-            )
-        )
+        def is_positional(arg):
+            return not arg.startswith("--")
+
+        existing_positional_args = len(list(takewhile(is_positional, previous_args)))
 
         namespace_key, command_name = resolve_command(command_name, cache=self.cache)
         parameters = (
@@ -549,13 +547,15 @@ class System:
         numerical_options = set()
         # Required args don't have named flags if there is a var positional.
         has_var_positional = False
-        for param in parameters:
+        for param_index, param in enumerate(parameters):
             if param.kind == param.VAR_POSITIONAL:
                 has_var_positional = True
                 continue
             arg_name = f"--{param.name}"
             if param.default == Signature.empty:
-                if arg_name not in previous_args:
+                # Required arg
+                present_positionally = existing_positional_args <= param_index
+                if present_positionally and arg_name not in previous_args:
                     missing_required_args.append(arg_name)
                 continue
 
@@ -576,7 +576,7 @@ class System:
         # to indicate to the shell that standard file/dir completion is desired.
         if (
             previous_args
-            and previous_args[-1].startswith("--")
+            and not is_positional(previous_args[-1])
             and previous_args[-1] not in boolean_options
         ):
             if previous_args[-1] in numerical_options:
