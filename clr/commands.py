@@ -13,6 +13,7 @@ from collections import namedtuple
 from typing import Dict, Callable, Any
 import shutil
 import argparse
+from itertools import takewhile
 
 import clr.config
 
@@ -104,9 +105,9 @@ def resolve_command(query, cache=None):
 
     if namespace_key not in NAMESPACE_KEYS:
         print(
-            f"Error! Command namespace '{namespace_key}' does not exist.\nClosest matches: "
-            f"{_get_close_matches(namespace_key, NAMESPACE_KEYS)}\n\nAvailable namespaces: "
-            f"{NAMESPACE_KEYS}",
+            f"Error! Command namespace '{namespace_key}' does not exist.\n"
+            f"Closest matches: {_get_close_matches(namespace_key, NAMESPACE_KEYS)}\n\n"
+            f"Available namespaces: {NAMESPACE_KEYS}",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -295,7 +296,12 @@ class Namespace:
                 elif param.kind == param.VAR_POSITIONAL:
                     # Vararg (*args) param. There will only ever be one of these
                     # it will be at the end of the positional args.
-                    parser.add_argument(name, type=str, nargs="*")
+                    if self.key == "system" and command_name == "smart_complete":
+                        # Special case to support smart completions.
+                        nargs = argparse.REMAINDER
+                    else:
+                        nargs = "*"
+                    parser.add_argument(name, type=str, nargs=nargs)
                 else:
                     raise AssertionError(
                         f"Unexpected kind of positional param {name} in "
@@ -459,7 +465,7 @@ class System:
         # Remove file. Process exits after this, will get recreated on next run.
         os.remove(self.cache.cache_fn)
 
-    def cmd_completion_command(self, query=""):
+    def cmd_complete_command(self, query=""):
         """Completion results for first arg to clr."""
 
         results = []
@@ -472,10 +478,9 @@ class System:
             namespace_key, _ = query.split(":", 1)
             namespace = self.cache.get(namespace_key)
             results.extend(f"{namespace_key}:{c} " for c in namespace.commands)
+        print_for_complete(query, results, add_space=False)
 
-        print("\n".join(r for r in results if r.startswith(query)), end="")
-
-    def cmd_completion_arg(self, command_name, partial="", bools_only=False):
+    def cmd_complete_arg(self, command_name, partial="", bools_only=False):
         """Completion results for arguments.
 
         Optionally only prints out the boolean flags."""
@@ -494,7 +499,96 @@ class System:
                 options.append(f"--no{param.name}")
         # partial is prepended with a space to stop argparse from parsing it
         partial = partial.strip()
-        print("\n".join(f"{o} " for o in options if o.startswith(partial)), end="")
+        print_for_complete(partial, results)
+
+    def cmd_smart_complete(self, *existing_args):
+        """Smart/opinionated completion.
+
+        Only completes the next missing required arg if there are any. Afterward
+        suggests optional args."""
+
+        if len(existing_args) < 2:
+            # Invalid call.
+            return
+
+        command_name = existing_args[1]
+        existing_args = existing_args[2:]
+
+        # existing_args will contain at least an empty str element if we're past the command name.
+        if not existing_args:
+            self.cmd_complete_command(query=command_name)
+            return
+
+        # Special case for the first/only arg to help.
+        if command_name in ("system:help", "help") and len(existing_args) < 2:
+            self.cmd_complete_command(query=existing_args[0])
+            return
+
+        current_arg = existing_args[-1]
+        previous_args = existing_args[:-1]
+
+        def is_positional(arg):
+            return not arg.startswith("--")
+
+        existing_positional_args = len(list(takewhile(is_positional, previous_args)))
+
+        namespace_key, command_name = resolve_command(command_name, cache=self.cache)
+        parameters = (
+            self.cache.get(namespace_key)
+            .command_specs[command_name]
+            .signature.parameters.values()
+        )
+
+        # Scan over all parameters for the command to build up data for the following purposes:
+        # Will suggest the first missing required arg if there is one.
+        missing_required_args = []
+        # Once all the required args are present, will suggest the optional ones.
+        missing_optional_args = []
+        # Boolean args don't need to be followed by an value.
+        boolean_options = set()
+        # No filename completion for numberical args.
+        numerical_options = set()
+        # Required args don't have named flags if there is a var positional.
+        has_var_positional = False
+        for param_index, param in enumerate(parameters):
+            if param.kind == param.VAR_POSITIONAL:
+                has_var_positional = True
+                continue
+
+            required = param.default == Signature.empty
+            missing_args = missing_required_args if required else missing_optional_args
+            arg_names = [f"--{param.name}"]
+
+            if type(param.default) == bool:
+                arg_names.append(f"--no{param.name}")
+                boolean_options.update(arg_names)
+            elif type(param.default) in (int, float):
+                numerical_options.update(arg_names)
+
+            present_positionally = existing_positional_args > param_index
+            present_named = any(a in previous_args for a in arg_names)
+            if not present_positionally and not present_named:
+                missing_args.extend(arg_names)
+
+        # If the previous argument is a flag that expects a value argument, return with exit code 2
+        # to indicate to the shell that standard file/dir completion is desired.
+        if (
+            previous_args
+            and not is_positional(previous_args[-1])
+            and previous_args[-1] not in boolean_options
+        ):
+            if previous_args[-1] in numerical_options:
+                # No completion.
+                return
+            return 2
+
+        if missing_required_args and not has_var_positional:
+            # Required arg not present. Suggest that only.
+            print(f"{missing_required_args[0]} ", end="")
+            return
+
+        # Suggest all missing optional args.
+        print_for_complete(current_arg, missing_optional_args)
 
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
@@ -570,3 +664,10 @@ class System:
     def cmd_argtest2(self, a, b, *c, d=4, e=None, f=False, g=""):
         """For testing arg parsing."""
         print(f"a={a} b={b} c={c} d={d} e={e} f={f} g={g}")
+
+
+def print_for_complete(current, options, add_space=True):
+    options = [o for o in options if o.startswith(current)]
+    if add_space:
+        options = [f"{o} " for o in options]
+    print("\n".join(options), end="")
