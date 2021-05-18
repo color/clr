@@ -1,3 +1,11 @@
+if ! declare -F _get_comp_words_by_ref > /dev/null; then
+    # Bash helper functions not avaliable.
+    # `brew install bash-completion` on OSX.
+    # Make sure to also source the bash_completion.sh in your .bash_profile.
+    echo "Not installing clr completions. Please install/source bash-completion."
+    return
+fi
+
 _clr_complete()
 {
     local IFS=$'\n'
@@ -14,4 +22,9 @@ _clr_complete()
     fi
 }
 
-complete -o nosort -o nospace -F _clr_complete clr
+clr_complete_options="-o nospace"
+# nosort is only avaliable in bash4+. os x still uses bash3 by default.
+[[ ${BASH_VERSINFO[0]} -ge 4 ]] && \
+    clr_complete_options="$clr_complete_options -o nosort"
+complete  $clr_complete_options -F _clr_complete clr
+
