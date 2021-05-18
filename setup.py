@@ -4,7 +4,7 @@ requirements = ["dataclasses==0.8;python_version<'3.7'"]
 
 setup(
     name="clr",
-    version="0.2.0",
+    version="0.3.0",
     description="A command line tool for executing custom python scripts.",
     author="Color",
     author_email="dev@getcolor.com",
