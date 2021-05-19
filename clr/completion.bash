@@ -1,8 +1,8 @@
 if ! declare -F _get_comp_words_by_ref > /dev/null; then
     # Bash helper functions not avaliable.
     # `brew install bash-completion` on OSX.
-    # Make sure to also source the bash_completion.sh in your .bash_profile.
-    echo "Not installing clr completions. Please install/source bash-completion."
+    # Also make sure to source the bash_completion.sh in your .bash_profile.
+    echo "Not installing clr completions. Please install/source bash-completion." 1>&2;
     return
 fi
 
