@@ -439,7 +439,7 @@ class NamespaceCache:
             # access it.
             with shelve.open(self.cache_fn) as cache_shelve:
                 self.cache = dict(cache_shelve)
-        except Exception as e:
+        except Exception:
             # Caching is considered best effort and fails silently. Can always load the
             # module, this is just slower.
             self.cache = {}
@@ -466,7 +466,7 @@ class NamespaceCache:
         try:
             with shelve.open(self.cache_fn) as cache_shelve:
                 cache_shelve[namespace_key] = entry
-        except Exception as e:
+        except Exception:
             pass
 
         return entry
