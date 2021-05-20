@@ -436,6 +436,16 @@ class NamespaceCache:
         # disk.
         self.cache = None
 
+    def get(self, namespace_key):
+        # Don't cache the system namespace. It is already loaded.
+        if namespace_key == "system":
+            return get_namespace("system")
+        # Return from cache if present.
+        self._load_cache()
+        if namespace_key in self.cache:
+            return self.cache[namespace_key]
+        return self._load_and_sync_entry(namespace_key)
+
     def _load_cache(self):
         if self.cache is not None:
             # Already loaded.
@@ -450,16 +460,6 @@ class NamespaceCache:
             # Caching is considered best effort and fails silently. Can always load the
             # module, this is just slower.
             self.cache = {}
-
-    def get(self, namespace_key):
-        # Don't cache the system namespace. It is already loaded.
-        if namespace_key == "system":
-            return get_namespace("system")
-        # Return from cache if present.
-        self._load_cache()
-        if namespace_key in self.cache:
-            return self.cache[namespace_key]
-        return self._load_and_sync_entry(namespace_key)
 
     def _load_and_sync_entry(self, namespace_key):
         namespace = get_namespace(namespace_key)
