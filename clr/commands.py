@@ -435,8 +435,8 @@ class NamespaceCache:
 
         try:
             # Cache is stored on disk as a shelve, but loaded into memory and then
-            # closed right away so that multiple processes won't conflict trying to
-            # access it.
+            # closed right away so that multiple processes are unlikely to conflict
+            # trying to access it.
             with shelve.open(self.cache_fn) as cache_shelve:
                 self.cache = dict(cache_shelve)
         except Exception:
