@@ -432,7 +432,7 @@ class NamespaceCache:
         # be left behind after the process is complete for subsequent clr calls to find.
         tmpdir = os.environ.get("TMPDIR", "/tmp")
         self.cache_fn = os.path.join(tmpdir, "clr_command_cache")
-        # Lazily load the cache file so that clr calls that don't need it will hit the
+        # Lazily load the cache file so that clr calls that don't need to won't hit the
         # disk.
         self.cache = None
 
@@ -441,12 +441,12 @@ class NamespaceCache:
         if namespace_key == "system":
             return get_namespace("system")
         # Return from cache if present.
-        self._load_cache()
+        self._load_cache_if_needed()
         if namespace_key in self.cache:
             return self.cache[namespace_key]
         return self._load_and_sync_entry(namespace_key)
 
-    def _load_cache(self):
+    def _load_cache_if_needed(self):
         if self.cache is not None:
             # Already loaded.
             return
