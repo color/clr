@@ -1,10 +1,10 @@
 from setuptools import setup
 
-requirements = ["dataclasses==0.8;python_version<'3.7'"]
+requirements = ["dataclasses;python_version<'3.7'"]
 
 setup(
     name="clr",
-    version="0.3.0",
+    version="0.3.2",
     description="A command line tool for executing custom python scripts.",
     author="Color",
     author_email="dev@getcolor.com",
