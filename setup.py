@@ -1,6 +1,6 @@
 from setuptools import setup
 
-requirements = ["dataclasses==0.8,~=0.6;python_version<'3.7'"]
+requirements = ["dataclasses;python_version<'3.7'"]
 
 setup(
     name="clr",
