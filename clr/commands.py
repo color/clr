@@ -421,28 +421,63 @@ class NamespaceCache:
 
     This allows subsequent calls to `clr help` or `clr completion_*` to be fast.
     Necessary to work around the fact that many clr command namespace modules
-    import the world and initialize state on import.
+    import the world and initialize state on import. The cache is used only for
+    help and completion calls, when actually calling a clr command its spec is
+    always loaded from the module.
     """
 
     def __init__(self):
+        # Place the cache file in the temp dir with a static file name. Data stored in
+        # this file is easily regeneratable in the event of a system restart, but should
+        # be left behind after the process is complete for subsequent clr calls to find.
         tmpdir = os.environ.get("TMPDIR", "/tmp")
         self.cache_fn = os.path.join(tmpdir, "clr_command_cache")
-        # Clr processes are short lived. We don't close the shelve, but are
-        # careful to sync it after writes.
-        self.cache = shelve.open(self.cache_fn)
+        # Lazily load the cache file so that clr calls that don't need to won't hit the
+        # disk.
+        self.cache = None
 
     def get(self, namespace_key):
         # Don't cache the system namespace. It is already loaded.
         if namespace_key == "system":
             return get_namespace("system")
-        # Load namespace and save spec to the shelve.
-        if namespace_key not in self.cache:
-            namespace = get_namespace(namespace_key)
-            if isinstance(namespace, ErrorLoadingNamespace):
-                return namespace
-            self.cache[namespace_key] = NamespaceCacheEntry.create(namespace)
-            self.cache.sync()
-        return self.cache[namespace_key]
+        # Return from cache if present.
+        self._load_cache_if_needed()
+        if namespace_key in self.cache:
+            return self.cache[namespace_key]
+        return self._load_and_sync_entry(namespace_key)
+
+    def _load_cache_if_needed(self):
+        if self.cache is not None:
+            # Already loaded.
+            return
+        try:
+            # Cache is stored on disk as a shelve, but loaded into memory and then
+            # closed right away so that multiple processes are unlikely to conflict
+            # trying to access it.
+            with shelve.open(self.cache_fn) as cache_shelve:
+                self.cache = dict(cache_shelve)
+        except Exception:
+            # Caching is considered best effort and fails silently. Can always load the
+            # module, this is just slower.
+            self.cache = {}
+
+    def _load_and_sync_entry(self, namespace_key):
+        namespace = get_namespace(namespace_key)
+        if isinstance(namespace, ErrorLoadingNamespace):
+            # Don't cache errors.
+            return namespace
+
+        entry = NamespaceCacheEntry.create(namespace)
+        self.cache[namespace_key] = entry
+
+        # Try to save the entry to disk. Fail silently.
+        try:
+            with shelve.open(self.cache_fn) as cache_shelve:
+                cache_shelve[namespace_key] = entry
+        except Exception:
+            pass
+
+        return entry
 
 
 class System:
