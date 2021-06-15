@@ -44,7 +44,7 @@ def _load_namespace(key):
     command_callables = {
         method_name[4:]: method
         for method_name, method in inspect.getmembers(self, inspect.ismethod)
-        if method_name.startswith('cmd_')
+        if method_name.startswith("cmd_")
     }
     # Build CommandSpecs for each command. These contain metadata about the
     # command and its args. These are kept in a seperate dataclass from the
