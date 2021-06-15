@@ -43,7 +43,7 @@ def _load_namespace(key):
     longdescr = inspect.getdoc(instance) or getattr(instance, "longdescr", descr)
     command_callables = {
         method_name[4:]: method
-        for method_name, method in inspect.getmembers(self, inspect.ismethod)
+        for method_name, method in inspect.getmembers(instance, inspect.ismethod)
         if method_name.startswith("cmd_")
     }
     # Build CommandSpecs for each command. These contain metadata about the
