@@ -20,5 +20,3 @@ def main(argv=None):
     # Support exit codes.
     if type(result) == int:
         sys.exit(result)
-    if result:
-        print(f"Result: {result}")
