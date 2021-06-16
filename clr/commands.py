@@ -268,11 +268,18 @@ class Namespace:
         # Track whether there is a var positional/vararg/*args parameter. If so, less flexibility on
         # positional vs named.
         has_var_positional = any(p.kind == p.VAR_POSITIONAL for p in parameters)
+        # We are before a var_positional if there is a var_positional.
+        before_var_positional = has_var_positional
 
         # Add argument(s) to the parser for each param in the cmd signature.
         for param in parameters:
             name = param.name
             required = param.default == Signature.empty
+
+            if before_var_positional and param.kind == param.VAR_POSITIONAL:
+                before_var_positional = False
+            if before_var_positional and not required:
+                raise AssertionError(f'Can not have optional arg ({param}) before a *vararg in {self.key}.cmd_{command_name}')
 
             if required:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
@@ -446,6 +453,11 @@ class NamespaceCache:
             return self.cache[namespace_key]
         return self._load_and_sync_entry(namespace_key)
 
+    def clear(self):
+        # Create a new empty db.
+        with shelve.open(self.cache_fn, flag='n'):
+            pass
+
     def _load_cache_if_needed(self):
         if self.cache is not None:
             # Already loaded.
@@ -497,8 +509,7 @@ class System:
 
         clr caches command specs to disk to speed up help and completions.
         Run this to clear the cache if your results are stale."""
-        # Remove file. Process exits after this, will get recreated on next run.
-        os.remove(self.cache.cache_fn)
+        self.cache.clear()
 
     def cmd_complete_command(self, query=""):
         """Completion results for first arg to clr."""
