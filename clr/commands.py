@@ -279,7 +279,9 @@ class Namespace:
             if before_var_positional and param.kind == param.VAR_POSITIONAL:
                 before_var_positional = False
             if before_var_positional and not required:
-                raise AssertionError(f'Can not have optional arg ({param}) before a *vararg in {self.key}.cmd_{command_name}')
+                raise AssertionError(
+                    f"Can not have optional arg ({param}) before a *vararg in {self.key}.cmd_{command_name}"
+                )
 
             if required:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
@@ -455,7 +457,7 @@ class NamespaceCache:
 
     def clear(self):
         # Create a new empty db.
-        with shelve.open(self.cache_fn, flag='n'):
+        with shelve.open(self.cache_fn, flag="n"):
             pass
 
     def _load_cache_if_needed(self):
@@ -628,13 +630,26 @@ class System:
                 return
             return 2
 
-        if missing_required_args and not has_var_positional:
-            # Required arg not present. Suggest that only.
-            print(f"{missing_required_args[0]} ", end="")
-            return
+        if missing_required_args:
+            if has_var_positional:
+                # When there is a var positional arg, required args must be specified positionally.
+                if not current_arg:
+                    print(
+                        f"\nMust give positional arg for {missing_required_args[0]}",
+                        file=sys.stderr,
+                    )
+                return 2
+            else:
+                # Required arg not present. Suggest that only.
+                print(f"{missing_required_args[0]} ", end="")
+                return
 
         # Suggest all missing optional args.
         print_for_complete(current_arg, missing_optional_args)
+
+        # Standard file/dir completion for *arg.
+        if has_var_positional:
+            return 2
 
     def cmd_profile_imports(self, *namespaces):
         """Prints some debugging information about how long it takes to import clr namespaces."""
@@ -714,6 +729,8 @@ class System:
 
 def print_for_complete(current, options, add_space=True):
     options = [o for o in options if o.startswith(current)]
+    if not options:
+        return
     if add_space:
         options = [f"{o} " for o in options]
     print("\n".join(options), end="")
