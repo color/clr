@@ -31,7 +31,7 @@ def find_clrfile():
     for search_path in search_paths:
         file_path = search_path / NAME
         if file_path.exists():
-            return file_path
+            return str(file_path)
 
     print(
         f"WARNING: {NAME} could not be located. Only the `system` namespace will be avaliable."
