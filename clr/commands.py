@@ -14,6 +14,7 @@ from typing import Dict, Callable, Any
 import shutil
 import argparse
 from itertools import takewhile
+import traceback
 
 import clr.config
 
@@ -398,9 +399,10 @@ class ErrorLoadingNamespace:
 
     @property
     def longdescr(self):
+        tb = ''.join(traceback.TracebackException.from_exception(self.error).format())
         return (
             f"Error importing module '{NAMESPACE_MODULE_PATHS[self.key]}' for namespace "
-            f"'{self.key}':\n\n{self.error}"
+            f"'{self.key}':\n\n{type(self.error).__name__} {self.error}\n{tb}"
         )
 
 
