@@ -633,12 +633,6 @@ class System:
                 numerical_options.update(arg_names)
             elif issubclass(param.annotation, Enum):
                 enum_options[arg_names[0]] = param.annotation
-                # print('!', param.annotation)
-                # print(list(param.annotation))
-                # print(next((v for v in param.annotation if v.name=='SSM'), None))
-                # # print(param.annotation.__members__['SSM'])
-                # print(param.annotation.__members__.get('SSM', None))
-            # print(param.annotation, param)
 
             present_positionally = existing_positional_args > param_index
             present_named = any(a in previous_args for a in arg_names)
