@@ -14,7 +14,7 @@ def main(argv=None):
     bound_args = namespace.parse_args(cmd_name, argv[2:])
 
     # Call the command.
-    if hasattr(namespace.instance, 'cmdinit'):
+    if hasattr(namespace.instance, "cmdinit"):
         namespace.instance.cmdinit()
     result = namespace.command_callables[cmd_name](
         *bound_args.args, **bound_args.kwargs

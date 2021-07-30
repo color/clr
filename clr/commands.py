@@ -128,6 +128,7 @@ def resolve_command(query, cache=None):
 
     return namespace_key, command_name
 
+
 def _get_arg_type(param):
     """Returns the type/parser that should be used for the given command Parameter.
 
@@ -138,18 +139,26 @@ def _get_arg_type(param):
 
     # Special support for type hinted Enum params.
     if issubclass(param.annotation, Enum):
+
         def enum_parser(arg):
             arg = arg.upper()
-            assert arg in param.annotation.__members__, f"Arg ({param.name}) must be one of {[v.name for v in param.annotation]}."
+            assert (
+                arg in param.annotation.__members__
+            ), f"Arg ({param.name}) must be one of {[v.name for v in param.annotation]}."
             return param.annotation.__members__[arg]
+
         return enum_parser
 
     # Infer from type of default
     if param.default not in (Signature.empty, None):
         default_type = type(param.default)
-        assert default_type in (str, bool, int, float), f"Unexpected arg type for ({param.name}): {default_type}"
+        assert default_type in (
+            str,
+            bool,
+            int,
+            float,
+        ), f"Unexpected arg type for ({param.name}): {default_type}"
         return default_type
-
 
 
 class NoneIgnoringArgparseDestination(argparse.Namespace):
@@ -310,7 +319,6 @@ class Namespace:
                     f"Can not have optional arg ({param}) before a *vararg in {self.key}.cmd_{command_name}"
                 )
 
-
             if required:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
                     if has_var_positional:
@@ -377,9 +385,7 @@ class Namespace:
                     )
                 else:
                     if has_var_positional:
-                        parser.add_argument(
-                            f"--{name}", type=arg_type, help=help_text
-                        )
+                        parser.add_argument(f"--{name}", type=arg_type, help=help_text)
                     else:
                         # Add both as optional (nargs=?) positional and named (--arg) for
                         # flexibility. Mutually exclusive and have the same dest.
@@ -419,7 +425,7 @@ class ErrorLoadingNamespace:
 
     @property
     def longdescr(self):
-        tb = ''.join(traceback.TracebackException.from_exception(self.error).format())
+        tb = "".join(traceback.TracebackException.from_exception(self.error).format())
         return (
             f"Error importing module '{NAMESPACE_MODULE_PATHS[self.key]}' for namespace "
             f"'{self.key}':\n\n{type(self.error).__name__} {self.error}\n{tb}"
@@ -657,7 +663,7 @@ class System:
                 # Suggest all enum values.
                 for value in enum_options[previous_args[-1]]:
                     if value.name.startswith(current_arg.upper()):
-                        print(f'{value.name.lower()} ')
+                        print(f"{value.name.lower()} ")
                 return
             # Return with exit code 2 to indicate to the shell that standard
             # file/dir completion is desired.
@@ -679,7 +685,6 @@ class System:
                 # Required arg not present. Suggest that only.
                 print(f"{missing_required_args[0]} ", end="")
                 return
-
 
         # Standard file/dir completion for *arg.
         if has_var_positional:
