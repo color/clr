@@ -128,6 +128,29 @@ def resolve_command(query, cache=None):
 
     return namespace_key, command_name
 
+def _get_arg_type(param):
+    """Returns the type/parser that should be used for the given command Parameter.
+
+    When result is None, argparse will assume it is just a string.
+
+    TODO(michael.cusack): Also look at other type annotations?
+    """
+
+    # Special support for type hinted Enum params.
+    if issubclass(param.annotation, Enum):
+        def enum_parser(arg):
+            arg = arg.upper()
+            assert arg in param.annotation.__members__, f"Arg ({param.name}) must be one of {[v.name for v in param.annotation]}."
+            return param.annotation.__members__[arg]
+        return enum_parser
+
+    # Infer from type of default
+    if param.default not in (Signature.empty, None):
+        default_type = type(param.default)
+        assert default_type in (str, bool, int, float), f"Unexpected arg type for ({param.name}): {default_type}"
+        return default_type
+
+
 
 class NoneIgnoringArgparseDestination(argparse.Namespace):
     """argparse destination namespace that ignores attributes changed to None.
@@ -278,6 +301,7 @@ class Namespace:
         for param in parameters:
             name = param.name
             required = param.default == Signature.empty
+            arg_type = _get_arg_type(param)
 
             if before_var_positional and param.kind == param.VAR_POSITIONAL:
                 before_var_positional = False
@@ -286,16 +310,6 @@ class Namespace:
                     f"Can not have optional arg ({param}) before a *vararg in {self.key}.cmd_{command_name}"
                 )
 
-            # When None will assume str type.
-            arg_type = None
-
-            # Special support for Enum values.
-            if issubclass(param.annotation, Enum):
-                def enum_parser(arg):
-                    arg = arg.upper()
-                    assert arg in param.annotation.__members__, f"Arg ({name}) must be one of {[v.name for v in param.annotation]}."
-                    return param.annotation.__members__[arg]
-                arg_type = enum_parser
 
             if required:
                 if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
@@ -338,15 +352,6 @@ class Namespace:
                     raise AssertionError(
                         f"Unexpected kwarg **{name} in {command_name}."
                     )
-
-                if not arg_type and param.default is not None:
-                    # Infer from type of default
-                    arg_type = type(param.default)
-                    if arg_type not in (str, bool, int, float):
-                        raise AssertionError(
-                            f"Unexpected arg type for {name} in {command_name}: "
-                            f"{arg_type}"
-                        )
 
                 # Put the default in the help text to clarify behavior when it is not specified.
                 default_text = str(param.default)
