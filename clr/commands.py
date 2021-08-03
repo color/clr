@@ -1,4 +1,6 @@
 from importlib import import_module
+
+from enum import Enum
 from dataclasses import dataclass
 import inspect
 from inspect import Signature
@@ -125,6 +127,38 @@ def resolve_command(query, cache=None):
         sys.exit(1)
 
     return namespace_key, command_name
+
+
+def _get_arg_type(param):
+    """Returns the type/parser that should be used for the given command Parameter.
+
+    When result is None, argparse will assume it is just a string.
+
+    TODO(michael.cusack): Also look at other type annotations?
+    """
+
+    # Special support for type hinted Enum params.
+    if issubclass(param.annotation, Enum):
+
+        def enum_parser(arg):
+            arg = arg.upper()
+            assert (
+                arg in param.annotation.__members__
+            ), f"Arg ({param.name}) must be one of {[v.name for v in param.annotation]}."
+            return param.annotation.__members__[arg]
+
+        return enum_parser
+
+    # Infer from type of default
+    if param.default not in (Signature.empty, None):
+        default_type = type(param.default)
+        assert default_type in (
+            str,
+            bool,
+            int,
+            float,
+        ), f"Unexpected arg type for ({param.name}): {default_type}"
+        return default_type
 
 
 class NoneIgnoringArgparseDestination(argparse.Namespace):
@@ -276,6 +310,7 @@ class Namespace:
         for param in parameters:
             name = param.name
             required = param.default == Signature.empty
+            arg_type = _get_arg_type(param)
 
             if before_var_positional and param.kind == param.VAR_POSITIONAL:
                 before_var_positional = False
@@ -294,13 +329,13 @@ class Namespace:
                         group = parser.add_mutually_exclusive_group(required=True)
                         group.add_argument(
                             f"--{name}",
-                            type=str,
+                            type=arg_type,
                             help=f"Required. Can also be specified with positional arg {name}.",
                         )
                         group.add_argument(
                             name,
                             nargs="?",
-                            type=str,
+                            type=arg_type,
                             help=f"Required. Can also be specified with --{name}.",
                         )
                 elif param.kind == param.VAR_POSITIONAL:
@@ -326,20 +361,13 @@ class Namespace:
                         f"Unexpected kwarg **{name} in {command_name}."
                     )
 
-                # Assume string type for most args.
-                default_type = str
-                if param.default is not None:
-                    default_type = type(param.default)
-                if default_type not in (str, bool, int, float):
-                    raise AssertionError(
-                        f"Unexpected arg type for {name} in {command_name}: "
-                        f"{default_type}"
-                    )
-
                 # Put the default in the help text to clarify behavior when it is not specified.
-                help_text = f"Optional. Defaults to {name}='{param.default}'."
+                default_text = str(param.default)
+                if isinstance(param.default, Enum):
+                    default_text = param.default.name.lower()
+                help_text = f"Optional. Defaults to {name}='{default_text}'."
 
-                if default_type == bool:
+                if arg_type == bool:
                     # Add both the --arg and --noarg options, but make them mutally exclusive.
                     group = parser.add_mutually_exclusive_group()
                     group.add_argument(
@@ -357,9 +385,7 @@ class Namespace:
                     )
                 else:
                     if has_var_positional:
-                        parser.add_argument(
-                            f"--{name}", type=default_type, help=help_text
-                        )
+                        parser.add_argument(f"--{name}", type=arg_type, help=help_text)
                     else:
                         # Add both as optional (nargs=?) positional and named (--arg) for
                         # flexibility. Mutually exclusive and have the same dest.
@@ -367,12 +393,12 @@ class Namespace:
                         group.add_argument(
                             name,
                             nargs="?",
-                            type=default_type,
+                            type=arg_type,
                             help=f"{help_text} Can also be specified with --{name}.",
                         )
                         group.add_argument(
                             f"--{name}",
-                            type=default_type,
+                            type=arg_type,
                             help=f"{help_text} Can also be specified with positional arg {name}.",
                         )
         return parser
@@ -399,7 +425,7 @@ class ErrorLoadingNamespace:
 
     @property
     def longdescr(self):
-        tb = ''.join(traceback.TracebackException.from_exception(self.error).format())
+        tb = "".join(traceback.TracebackException.from_exception(self.error).format())
         return (
             f"Error importing module '{NAMESPACE_MODULE_PATHS[self.key]}' for namespace "
             f"'{self.key}':\n\n{type(self.error).__name__} {self.error}\n{tb}"
@@ -598,6 +624,8 @@ class System:
         boolean_options = set()
         # No filename completion for numberical args.
         numerical_options = set()
+        # Mapping from enum options to their class,
+        enum_options = {}
         # Required args don't have named flags if there is a var positional.
         has_var_positional = False
         for param_index, param in enumerate(parameters):
@@ -614,14 +642,15 @@ class System:
                 boolean_options.update(arg_names)
             elif type(param.default) in (int, float):
                 numerical_options.update(arg_names)
+            elif issubclass(param.annotation, Enum):
+                enum_options[arg_names[0]] = param.annotation
 
             present_positionally = existing_positional_args > param_index
             present_named = any(a in previous_args for a in arg_names)
             if not present_positionally and not present_named:
                 missing_args.extend(arg_names)
 
-        # If the previous argument is a flag that expects a value argument, return with exit code 2
-        # to indicate to the shell that standard file/dir completion is desired.
+        # If the previous argument is a flag that expects a value argument.
         if (
             previous_args
             and not is_positional(previous_args[-1])
@@ -630,7 +659,18 @@ class System:
             if previous_args[-1] in numerical_options:
                 # No completion.
                 return
+            if previous_args[-1] in enum_options:
+                # Suggest all enum values.
+                for value in enum_options[previous_args[-1]]:
+                    if value.name.startswith(current_arg.upper()):
+                        print(f"{value.name.lower()} ")
+                return
+            # Return with exit code 2 to indicate to the shell that standard
+            # file/dir completion is desired.
             return 2
+
+        # Suggest all missing optional args.
+        print_for_complete(current_arg, missing_optional_args)
 
         if missing_required_args:
             if has_var_positional:
@@ -645,9 +685,6 @@ class System:
                 # Required arg not present. Suggest that only.
                 print(f"{missing_required_args[0]} ", end="")
                 return
-
-        # Suggest all missing optional args.
-        print_for_complete(current_arg, missing_optional_args)
 
         # Standard file/dir completion for *arg.
         if has_var_positional:
