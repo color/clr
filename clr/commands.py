@@ -129,6 +129,11 @@ def resolve_command(query, cache=None):
     return namespace_key, command_name
 
 
+def _is_enum_param(param):
+    """Returns whether the given param is annotated as an enum subclass."""
+    return inspect.isclass(param.annotation) and issubclass(param.annotation, Enum)
+
+
 def _get_arg_type(param):
     """Returns the type/parser that should be used for the given command Parameter.
 
@@ -138,7 +143,7 @@ def _get_arg_type(param):
     """
 
     # Special support for type hinted Enum params.
-    if issubclass(param.annotation, Enum):
+    if _is_enum_param(param):
 
         def enum_parser(arg):
             arg = arg.upper()
@@ -642,7 +647,7 @@ class System:
                 boolean_options.update(arg_names)
             elif type(param.default) in (int, float):
                 numerical_options.update(arg_names)
-            elif issubclass(param.annotation, Enum):
+            elif _is_enum_param(param):
                 enum_options[arg_names[0]] = param.annotation
 
             present_positionally = existing_positional_args > param_index
