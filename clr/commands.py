@@ -147,9 +147,8 @@ def _get_arg_type(param):
 
         def enum_parser(arg):
             arg = arg.upper()
-            assert (
-                arg in param.annotation.__members__
-            ), f"Arg ({param.name}={arg}) must be one of {tuple(param.annotation.__members__.keys())}."
+            options = set(key.upper() for key in param.annotation.__members__)
+            assert arg in options, f"Arg ({param.name}={arg}) must be one of {options}."
             return param.annotation.__members__[arg]
 
         return enum_parser
