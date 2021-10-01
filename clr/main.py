@@ -19,6 +19,6 @@ def main(argv=None):
     result = namespace.command_callables[cmd_name](
         *bound_args.args, **bound_args.kwargs
     )
-    # Support exit codes.
-    if type(result) == int:
+    # Support exit codes. This will support int and bool return values.
+    if isinstance(result, int):
         sys.exit(result)
