@@ -2,6 +2,7 @@ import sys
 import os
 import getpass
 import beeline
+import socket
 from clr.commands import resolve_command, get_namespace
 from clrenv import env
 
@@ -32,6 +33,7 @@ def main(argv=None):
     trace = beeline.start_trace(context={
         "name": cmd_name,
         "username": getpass.getuser(),
+        "hostname": socket.gethostname(),
     })
 
     if hasattr(namespace.instance, "cmdinit"):
@@ -47,7 +49,7 @@ def main(argv=None):
             *bound_args.args, **bound_args.kwargs
         )
     except Exception as e:
-        print('Error running command', e)
+        print('Error running command: %s', e, file=sys.stderr)
         beeline.add_context_field('raised_exception', True)
         exit_code = 1
 
