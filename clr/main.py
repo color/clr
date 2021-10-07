@@ -60,4 +60,8 @@ def main(argv=None):
     beeline.add_context_field('exit_code', exit_code)
     beeline.finish_trace(trace)
     beeline.close()
-    sys.exit(exit_code)
+
+    # only exit if we have a non-zero code otherwise we want python to handle
+    # exit codes
+    if exit_code != 0:
+        sys.exit(exit_code)

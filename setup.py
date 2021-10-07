@@ -1,6 +1,6 @@
 from setuptools import setup
 
-requirements = ["dataclasses;python_version<'3.7'"]
+requirements = ["dataclasses;python_version<'3.7'", "honeycomb-beeline", "clrenv"]
 
 setup(
     name="clr",

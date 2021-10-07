@@ -4,3 +4,4 @@
 build
 .eggs
 clr.egg-info
+local

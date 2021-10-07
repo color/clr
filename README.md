@@ -58,5 +58,5 @@ pip install -e .
 ```
 * Run the tests
 ```
-python setup.py test
+COLOR_ENV=tests/env.yaml python setup.py test
 ```
