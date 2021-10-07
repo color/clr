@@ -1,7 +1,6 @@
 import sys
 import os
 import getpass
-import socket
 import beeline
 from clr.commands import resolve_command, get_namespace
 from clrenv import env
