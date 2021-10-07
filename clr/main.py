@@ -15,7 +15,7 @@ def init_beeline(service_name):
                 debug=False,
             )
         except Exception as e:
-            print('Failed to initialize beeline: %s', e)
+            print('Failed to initialize beeline: %s', e, file=sys.stderr)
 
 def main(argv=None):
     if not argv:
