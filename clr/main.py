@@ -7,7 +7,7 @@ from clr.commands import resolve_command, get_namespace
 from clrenv import env
 
 def init_beeline(service_name):
-    if 'honeycomb' in env:
+    if env.get('honeycomb') is not None:
         try:
             beeline.init(
                 writekey=env.honeycomb.writekey,
@@ -37,9 +37,8 @@ def main(argv=None):
     })
 
     if hasattr(namespace.instance, "cmdinit"):
-        cmdinit_span = beeline.start_span({"name": "cmdinit"})
-        namespace.instance.cmdinit()
-        beeline.finish_span(cmdinit_span)
+        with beeline.tracer(name="cmdinit"):
+            namespace.instance.cmdinit()
 
     cmdrun_span = beeline.start_span({"name": "cmdrun"})
     exit_code = 0
