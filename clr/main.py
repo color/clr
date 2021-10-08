@@ -62,9 +62,8 @@ def main(argv=None):
                 result = namespace.command_callables[cmd_name](
                     *bound_args.args, **bound_args.kwargs
                 )
-                # Support exit codes. This supports int and bool return values.
                 if isinstance(result, (int, bool)):
-                    exit_code = result
+                    exit_code = int(result)
             except:
                 print(traceback.format_exc(), file=sys.stderr)
                 beeline.add_context_field('raised_exception', True)
