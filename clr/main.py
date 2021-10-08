@@ -10,25 +10,26 @@ from clrenv import env
 
 
 @contextmanager
-def init_beeline(service_name, cmd_name):
+def init_beeline(namespace_key, cmd_name):
     # clrenv < 0.2.0 has a bug in the `in` operator at the root level.
-    if env.get('honeycomb') is not None:
+    if env.get("honeycomb") is not None:
         try:
             beeline.init(
                 writekey=env.honeycomb.writekey,
-                dataset='clr',
-                service_name=service_name,
+                dataset="clr",
+                service_name="clr",
                 debug=False,
             )
         except Exception as e:
             # Honeycomb logging is completely optional and all later calls to
             # beeline are silently no-ops if not initialized. Simply log the
             # failure and continue normally.
-            print('Failed to initialize beeline: %s', e, file=sys.stderr)
+            print("Failed to initialize beeline: %s", e, file=sys.stderr)
 
         trace = beeline.start_trace(
             context={
-                "name": cmd_name,
+                "namespace": namespace_key,
+                "cmd": cmd_name,
                 "username": getpass.getuser(),
                 "hostname": socket.gethostname(),
             }
@@ -69,9 +70,9 @@ def main(argv=None):
                     exit_code = int(result)
             except:
                 print(traceback.format_exc(), file=sys.stderr)
-                beeline.add_context_field('raised_exception', True)
+                beeline.add_context_field("raised_exception", True)
                 exit_code = 999
 
-        beeline.add_context_field('exit_code', exit_code)
+        beeline.add_context_field("exit_code", exit_code)
 
     sys.exit(exit_code)
