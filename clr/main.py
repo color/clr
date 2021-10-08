@@ -6,7 +6,9 @@ import socket
 from clr.commands import resolve_command, get_namespace
 from clrenv import env
 
+
 def init_beeline(service_name):
+    # clrenv < 0.2.0 has a bug in the `in` operator at the root level.
     if env.get('honeycomb') is not None:
         try:
             beeline.init(
@@ -17,6 +19,7 @@ def init_beeline(service_name):
             )
         except Exception as e:
             print('Failed to initialize beeline: %s', e, file=sys.stderr)
+
 
 def main(argv=None):
     if not argv:
@@ -30,11 +33,13 @@ def main(argv=None):
     bound_args = namespace.parse_args(cmd_name, argv[2:])
 
     init_beeline(namespace_key)
-    trace = beeline.start_trace(context={
-        "name": cmd_name,
-        "username": getpass.getuser(),
-        "hostname": socket.gethostname(),
-    })
+    trace = beeline.start_trace(
+        context={
+            "name": cmd_name,
+            "username": getpass.getuser(),
+            "hostname": socket.gethostname(),
+        }
+    )
 
     if hasattr(namespace.instance, "cmdinit"):
         with beeline.tracer(name="cmdinit"):
