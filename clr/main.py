@@ -28,18 +28,15 @@ def init_beeline(namespace_key, cmd_name):
         # failure and continue normally.
         print("Failed to initialize beeline: %s", e, file=sys.stderr)
 
-    trace = beeline.start_trace(
-        context={
-            "namespace": namespace_key,
-            "cmd": cmd_name,
-            "username": getpass.getuser(),
-            "hostname": socket.gethostname(),
-        }
-    )
-    # Bounce back to the calling code.
-    yield trace
+    with beeline.tracer("cmd"):
+        beeline.add_context_field("namespace", namespace_key)
+        beeline.add_context_field("cmd", cmd_name)
+        beeline.add_context_field("username", getpass.getuser())
+        beeline.add_context_field("hostname", socket.gethostname())
 
-    beeline.finish_trace(trace)
+        # Bounce back to the calling code.
+        yield
+
     beeline.close()
 
 
@@ -53,6 +50,7 @@ def main(argv=None):
     namespace_key, cmd_name = resolve_command(query)
     namespace = get_namespace(namespace_key)
 
+    # Default successful exit code.
     exit_code = 0
 
     with init_beeline(namespace_key, cmd_name):
