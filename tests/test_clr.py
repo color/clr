@@ -4,15 +4,18 @@ import clr
 
 def test_argtest(capsys):
     def check(args, expected):
-        clr.main(["clr", "argtest"] + args)
+        with pytest.raises(SystemExit) as e:
+            clr.main(["clr", "argtest"] + args)
         captured = capsys.readouterr()
         assert expected in captured.out
+        assert e.value.code == 0
 
     def check_failure(args, expected):
-        with pytest.raises(SystemExit):
+        with pytest.raises(SystemExit) as e:
             clr.main(["clr", "argtest"] + args)
         captured = capsys.readouterr()
         assert expected in captured.err
+        assert e.value.code != 0
 
     check(["1", "2"], "a=1 b=2 c=4 d=None e=False f=True")
     check(["11", "2", "3"], "a=11 b=2 c=3 d=None e=False f=True")
@@ -39,15 +42,18 @@ def test_argtest(capsys):
 
 def test_argtest2(capsys):
     def check(args, expected):
-        clr.main(["clr", "argtest2"] + args)
+        with pytest.raises(SystemExit) as e:
+            clr.main(["clr", "argtest2"] + args)
         captured = capsys.readouterr()
         assert expected in captured.out
+        assert e.value.code == 0
 
     def check_failure(args, expected):
-        with pytest.raises(SystemExit):
+        with pytest.raises(SystemExit) as e:
             clr.main(["clr", "argtest2"] + args)
         captured = capsys.readouterr()
         assert expected in captured.err
+        assert e.value.code != 0
 
     check(["1", "2"], "a=1 b=2 c=() d=4 e=None f=False g=")
     check(["11", "2", "3"], "a=11 b=2 c=('3',) d=4 e=None f=False g=")

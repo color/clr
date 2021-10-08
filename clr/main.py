@@ -67,7 +67,4 @@ def main(argv=None):
     beeline.finish_trace(trace)
     beeline.close()
 
-    # only exit if we have a non-zero code otherwise we want python to handle
-    # exit codes
-    if exit_code != 0:
-        sys.exit(exit_code)
+    sys.exit(exit_code)
