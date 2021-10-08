@@ -26,13 +26,16 @@ def init_beeline(service_name, cmd_name):
             # failure and continue normally.
             print('Failed to initialize beeline: %s', e, file=sys.stderr)
 
-        yield beeline.start_trace(
+        trace = beeline.start_trace(
             context={
                 "name": cmd_name,
                 "username": getpass.getuser(),
                 "hostname": socket.gethostname(),
             }
         )
+        # Bounce back to the calling code.
+        yield trace
+
         beeline.finish_trace(trace)
         beeline.close()
 
@@ -69,6 +72,6 @@ def main(argv=None):
                 beeline.add_context_field('raised_exception', True)
                 exit_code = 999
 
-            beeline.add_context_field('exit_code', exit_code)
+        beeline.add_context_field('exit_code', exit_code)
 
     sys.exit(exit_code)
