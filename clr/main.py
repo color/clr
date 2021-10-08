@@ -7,7 +7,7 @@ from clr.commands import resolve_command, get_namespace
 from clrenv import env
 
 def init_beeline(service_name):
-    if env.honeycomb.writekey is not None:
+    if 'honeycomb' in env:
         try:
             beeline.init(
                 writekey=env.honeycomb.writekey,

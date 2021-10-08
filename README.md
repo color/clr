@@ -58,5 +58,5 @@ pip install -e .
 ```
 * Run the tests
 ```
-COLOR_ENV=tests/env.yaml python setup.py test
+CLRENV_PATH=tests/env.yaml python setup.py test
 ```
