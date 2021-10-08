@@ -12,33 +12,35 @@ from clrenv import env
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
     # clrenv < 0.2.0 has a bug in the `in` operator at the root level.
-    if env.get("honeycomb") is not None:
-        try:
-            beeline.init(
-                writekey=env.honeycomb.writekey,
-                dataset="clr",
-                service_name="clr",
-                debug=False,
-            )
-        except Exception as e:
-            # Honeycomb logging is completely optional and all later calls to
-            # beeline are silently no-ops if not initialized. Simply log the
-            # failure and continue normally.
-            print("Failed to initialize beeline: %s", e, file=sys.stderr)
+    if env.get("honeycomb") is None:
+        return
 
-        trace = beeline.start_trace(
-            context={
-                "namespace": namespace_key,
-                "cmd": cmd_name,
-                "username": getpass.getuser(),
-                "hostname": socket.gethostname(),
-            }
+    try:
+        beeline.init(
+            writekey=env.honeycomb.writekey,
+            dataset="clr",
+            service_name="clr",
+            debug=False,
         )
-        # Bounce back to the calling code.
-        yield trace
+    except Exception as e:
+        # Honeycomb logging is completely optional and all later calls to
+        # beeline are silently no-ops if not initialized. Simply log the
+        # failure and continue normally.
+        print("Failed to initialize beeline: %s", e, file=sys.stderr)
 
-        beeline.finish_trace(trace)
-        beeline.close()
+    trace = beeline.start_trace(
+        context={
+            "namespace": namespace_key,
+            "cmd": cmd_name,
+            "username": getpass.getuser(),
+            "hostname": socket.gethostname(),
+        }
+    )
+    # Bounce back to the calling code.
+    yield trace
+
+    beeline.finish_trace(trace)
+    beeline.close()
 
 
 def main(argv=None):
