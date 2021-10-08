@@ -50,11 +50,13 @@ def main(argv=None):
 
     namespace_key, cmd_name = resolve_command(query)
     namespace = get_namespace(namespace_key)
-    bound_args = namespace.parse_args(cmd_name, argv[2:])
 
     exit_code = 0
 
     with init_beeline(namespace_key, cmd_name):
+        with beeline.tracer(name="parse_args"):
+            bound_args = namespace.parse_args(cmd_name, argv[2:])
+
         # Some namespaces define a cmdinit function which should be run first.
         if hasattr(namespace.instance, "cmdinit"):
             with beeline.tracer(name="cmdinit"):
