@@ -7,33 +7,33 @@ import traceback
 from contextlib import contextmanager
 from clr.commands import resolve_command, get_namespace
 
+DEBUG_MODE = os.environ.get("CLR_DEBUG", "").lower() in ("true", "1")
+
+
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
     try:
         from clrenv import env
+
         # clrenv < 0.2.0 has a bug in the `in` operator at the root level.
         if env.get("honeycomb") is not None:
             honeycomb_writekey = env.honeycomb.writekey
-    except Exception as e:
-        # On using env clrenv tries to load an environment file. In some cases
-        # we might not have a an environment file and we do not want to bomb if
-        # that is the case. However, as with the below exception beeline calls
-        # are silently no-ops so we have nothing to worry about if we cannot
-        # load env.
-        print("Failed to load clrenv env: %s", e, file=sys.stderr)
-
-    try:
         beeline.init(
             writekey=honeycomb_writekey,
             dataset="clr",
             service_name="clr",
             debug=False,
         )
-    except Exception as e:
+    except:
         # Honeycomb logging is completely optional and all later calls to
         # beeline are silently no-ops if not initialized. Simply log the
-        # failure and continue normally.
-        print("Failed to initialize beeline: %s", e, file=sys.stderr)
+        # failure and continue normally. This includes in clrenv can not be
+        # loaded.
+        if DEBUG_MODE:
+            import traceback
+
+            print("Failed to initialize beeline: %s", file=sys.stderr)
+            traceback.print_exc()
 
     with beeline.tracer("cmd"):
         beeline.add_trace_field("namespace", namespace_key)
