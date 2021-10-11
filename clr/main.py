@@ -26,7 +26,7 @@ def init_beeline(namespace_key, cmd_name):
     except:
         # Honeycomb logging is completely optional and all later calls to
         # beeline are silently no-ops if not initialized. Simply log the
-        # failure and continue normally. This includes in clrenv can not be
+        # failure and continue normally. This includes if clrenv can not be
         # loaded.
         if DEBUG_MODE:
             import traceback
