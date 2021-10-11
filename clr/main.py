@@ -6,11 +6,11 @@ import socket
 import traceback
 from contextlib import contextmanager
 from clr.commands import resolve_command, get_namespace
-from clrenv import env
 
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
     try:
+        from clrenv import env
         # clrenv < 0.2.0 has a bug in the `in` operator at the root level.
         if env.get("honeycomb") is not None:
             honeycomb_writekey = env.honeycomb.writekey
