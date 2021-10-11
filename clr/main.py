@@ -36,10 +36,10 @@ def init_beeline(namespace_key, cmd_name):
         print("Failed to initialize beeline: %s", e, file=sys.stderr)
 
     with beeline.tracer("cmd"):
-        beeline.add_context_field("namespace", namespace_key)
-        beeline.add_context_field("cmd", cmd_name)
-        beeline.add_context_field("username", getpass.getuser())
-        beeline.add_context_field("hostname", socket.gethostname())
+        beeline.add_trace_field("namespace", namespace_key)
+        beeline.add_trace_field("cmd", cmd_name)
+        beeline.add_trace_field("username", getpass.getuser())
+        beeline.add_trace_field("hostname", socket.gethostname())
 
         # Bounce back to the calling code.
         yield
@@ -79,9 +79,9 @@ def main(argv=None):
                     exit_code = int(result)
             except:
                 print(traceback.format_exc(), file=sys.stderr)
-                beeline.add_context_field("raised_exception", True)
+                beeline.add_trace_field("raised_exception", True)
                 exit_code = 999
 
-        beeline.add_context_field("exit_code", exit_code)
+        beeline.add_trace_field("exit_code", exit_code)
 
     sys.exit(exit_code)
