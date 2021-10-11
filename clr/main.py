@@ -8,16 +8,23 @@ from contextlib import contextmanager
 from clr.commands import resolve_command, get_namespace
 from clrenv import env
 
-
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
-    # clrenv < 0.2.0 has a bug in the `in` operator at the root level.
-    if env.get("honeycomb") is None:
-        return
+    try:
+        # clrenv < 0.2.0 has a bug in the `in` operator at the root level.
+        if env.get("honeycomb") is not None:
+            honeycomb_writekey = env.honeycomb.writekey
+    except Exception as e:
+        # On using env clrenv tries to load an environment file. In some cases
+        # we might not have a an environment file and we do not want to bomb if
+        # that is the case. However, as with the below exception beeline calls
+        # are silently no-ops so we have nothing to worry about if we cannot
+        # load env.
+        print("Failed to load clrenv env: %s", e, file=sys.stderr)
 
     try:
         beeline.init(
-            writekey=env.honeycomb.writekey,
+            writekey=honeycomb_writekey,
             dataset="clr",
             service_name="clr",
             debug=False,
