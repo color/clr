@@ -17,13 +17,12 @@ def init_beeline(namespace_key, cmd_name):
 
         # clrenv < 0.2.0 has a bug in the `in` operator at the root level.
         if env.get("honeycomb") is not None:
-            honeycomb_writekey = env.honeycomb.writekey
-        beeline.init(
-            writekey=honeycomb_writekey,
-            dataset="clr",
-            service_name="clr",
-            debug=False,
-        )
+            beeline.init(
+                writekey=env.honeycomb.writekey,
+                dataset="clr",
+                service_name="clr",
+                debug=False,
+            )
     except:
         # Honeycomb logging is completely optional and all later calls to
         # beeline are silently no-ops if not initialized. Simply log the
