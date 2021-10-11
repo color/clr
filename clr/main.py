@@ -31,7 +31,7 @@ def init_beeline(namespace_key, cmd_name):
         if DEBUG_MODE:
             import traceback
 
-            print("Failed to initialize beeline: %s", file=sys.stderr)
+            print("Failed to initialize beeline.", file=sys.stderr)
             traceback.print_exc()
 
     with beeline.tracer("cmd"):
