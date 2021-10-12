@@ -1,7 +1,6 @@
 import sys
 import os
 import getpass
-import beeline
 import socket
 import traceback
 from contextlib import contextmanager
@@ -9,9 +8,25 @@ from clr.commands import resolve_command, get_namespace
 
 DEBUG_MODE = os.environ.get("CLR_DEBUG", "").lower() in ("true", "1")
 
+# In general using a try to handle if we should import or not is not best
+# practice. However in this case we do not want this code to possibly
+# break anything so we use try to figure out if we should import or not.
+beeline = None
+try:
+    import beeline
+except:
+    if DEBUG_MODE:
+        import traceback
+
+        print("Failed to import beeline.", file=sys.stderr)
+        traceback.print_exc()
 
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
+    if beeline is None:
+        yield
+        return
+
     try:
         from clrenv import env
 
@@ -34,6 +49,7 @@ def init_beeline(namespace_key, cmd_name):
             print("Failed to initialize beeline.", file=sys.stderr)
             traceback.print_exc()
 
+
     with beeline.tracer("cmd"):
         beeline.add_trace_field("namespace", namespace_key)
         beeline.add_trace_field("cmd", cmd_name)
@@ -45,6 +61,20 @@ def init_beeline(namespace_key, cmd_name):
 
     beeline.close()
 
+@contextmanager
+def beeline_tracer(name):
+    if beeline is None:
+        yield
+        return
+
+    with beeline.tracer(name):
+        yield
+
+def beeline_add_trace_field(key, value):
+    if beeline is None:
+        return
+
+    beeline.add_trace_field(key, value)
 
 def main(argv=None):
     if not argv:
@@ -60,7 +90,7 @@ def main(argv=None):
     exit_code = 0
 
     with init_beeline(namespace_key, cmd_name):
-        with beeline.tracer("parse_args"):
+        with beeline_tracer("parse_args"):
             bound_args = namespace.parse_args(cmd_name, argv[2:])
 
         # Some namespaces define a cmdinit function which should be run first.
@@ -68,7 +98,7 @@ def main(argv=None):
             with beeline.tracer("cmdinit"):
                 namespace.instance.cmdinit()
 
-        with beeline.tracer("cmdrun"):
+        with beeline_tracer("cmdrun"):
             result = None
             try:
                 result = namespace.command_callables[cmd_name](
@@ -78,9 +108,9 @@ def main(argv=None):
                     exit_code = int(result)
             except:
                 print(traceback.format_exc(), file=sys.stderr)
-                beeline.add_trace_field("raised_exception", True)
+                beeline_add_trace_field("raised_exception", True)
                 exit_code = 999
 
-        beeline.add_trace_field("exit_code", exit_code)
+        beeline_add_trace_field("exit_code", exit_code)
 
     sys.exit(exit_code)
