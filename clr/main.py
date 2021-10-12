@@ -2,7 +2,7 @@ import sys
 import os
 import getpass
 import beeline
-import socket
+import platform
 import traceback
 from contextlib import contextmanager
 from clr.commands import resolve_command, get_namespace
@@ -29,8 +29,6 @@ def init_beeline(namespace_key, cmd_name):
         # failure and continue normally. This includes if clrenv can not be
         # loaded.
         if DEBUG_MODE:
-            import traceback
-
             print("Failed to initialize beeline.", file=sys.stderr)
             traceback.print_exc()
 
@@ -38,7 +36,7 @@ def init_beeline(namespace_key, cmd_name):
         beeline.add_trace_field("namespace", namespace_key)
         beeline.add_trace_field("cmd", cmd_name)
         beeline.add_trace_field("username", getpass.getuser())
-        beeline.add_trace_field("hostname", socket.gethostname())
+        beeline.add_trace_field("hostname", platform.node())
 
         # Bounce back to the calling code.
         yield
