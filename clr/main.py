@@ -4,11 +4,16 @@ import getpass
 import beeline
 import platform
 import traceback
+import signal
 from contextlib import contextmanager
 from clr.commands import resolve_command, get_namespace
 
 DEBUG_MODE = os.environ.get("CLR_DEBUG", "").lower() in ("true", "1")
 
+def on_exit(signum, frame):
+    beeline.close()
+
+signal.signal(signal.SIGINT, on_exit)
 
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
