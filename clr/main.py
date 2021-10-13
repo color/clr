@@ -14,6 +14,7 @@ def on_exit(signum, frame):
     beeline.close()
 
 signal.signal(signal.SIGINT, on_exit)
+signal.signal(signal.SIGTERM, on_exit)
 
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
