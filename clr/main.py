@@ -11,6 +11,7 @@ from clr.commands import resolve_command, get_namespace
 DEBUG_MODE = os.environ.get("CLR_DEBUG", "").lower() in ("true", "1")
 
 def on_exit(signum, frame):
+    beeline.add_trace_field("force_killed", signal.Signals(signum).name)
     beeline.close()
 
 signal.signal(signal.SIGINT, on_exit)
