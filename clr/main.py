@@ -88,4 +88,5 @@ def main(argv=None):
 
         beeline.add_trace_field("exit_code", exit_code)
 
-    sys.exit(exit_code)
+    if exit_code != 0:
+        sys.exit(exit_code)

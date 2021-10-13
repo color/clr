@@ -4,18 +4,16 @@ import clr
 
 def test_argtest(capsys):
     def check(args, expected):
-        with pytest.raises(SystemExit) as e:
-            clr.main(["clr", "argtest"] + args)
+        clr.main(["clr", "argtest"] + args)
         captured = capsys.readouterr()
         assert expected in captured.out
-        assert e.value.code == 0
 
-    def check_failure(args, expected):
+    def check_failure(args, expected_err, expected_exit_code):
         with pytest.raises(SystemExit) as e:
             clr.main(["clr", "argtest"] + args)
         captured = capsys.readouterr()
-        assert expected in captured.err
-        assert e.value.code != 0
+        assert expected_err in captured.err
+        assert expected_exit_code == e.value.code
 
     check(["1", "2"], "a=1 b=2 c=4 d=None e=False f=True")
     check(["11", "2", "3"], "a=11 b=2 c=3 d=None e=False f=True")
@@ -28,9 +26,11 @@ def test_argtest(capsys):
     check(["1", "2", "--d=3"], "a=1 b=2 c=4 d=3 e=False f=True")
     check(["1", "2", "--nof", "--e"], "a=1 b=2 c=4 d=None e=True f=False")
     check(["1", "2", "--nof", "--noe"], "a=1 b=2 c=4 d=None e=False f=False")
-    check_failure(["1"], "one of the arguments --b b is required")
+    check_failure(["1"], "one of the arguments --b b is required", 2)
     check_failure(
-        ["11", "2", "--c=ccc"], "error: argument --c: invalid int value: 'ccc'"
+        ["11", "2", "--c=ccc"],
+        "error: argument --c: invalid int value: 'ccc'",
+        2
     )
     check(["1", "--b=2"], "a=1 b=2 c=4 d=None e=False f=True")
     check(["--a", "1", "--b=2"], "a=1 b=2 c=4 d=None e=False f=True")
@@ -42,18 +42,16 @@ def test_argtest(capsys):
 
 def test_argtest2(capsys):
     def check(args, expected):
-        with pytest.raises(SystemExit) as e:
-            clr.main(["clr", "argtest2"] + args)
+        clr.main(["clr", "argtest2"] + args)
         captured = capsys.readouterr()
         assert expected in captured.out
-        assert e.value.code == 0
 
-    def check_failure(args, expected):
+    def check_failure(args, expected_err, expected_exit_code):
         with pytest.raises(SystemExit) as e:
             clr.main(["clr", "argtest2"] + args)
         captured = capsys.readouterr()
-        assert expected in captured.err
-        assert e.value.code != 0
+        assert expected_err in captured.err
+        assert expected_exit_code == e.value.code
 
     check(["1", "2"], "a=1 b=2 c=() d=4 e=None f=False g=")
     check(["11", "2", "3"], "a=11 b=2 c=('3',) d=4 e=None f=False g=")
@@ -62,7 +60,7 @@ def test_argtest2(capsys):
         ["11", "2", "3", "4", "a", "b"],
         "a=11 b=2 c=('3', '4', 'a', 'b') d=4 e=None f=False g=",
     )
-    check_failure(["11"], "the following arguments are required: b")
+    check_failure(["11"], "the following arguments are required: b", 2)
     check(["11", "2", "3", "4", "--f"], "a=11 b=2 c=('3', '4') d=4 e=None f=True g=")
     check(
         ["11", "2", "3", "4", "--g=ggg", "--e=eee"],
