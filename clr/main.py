@@ -23,6 +23,10 @@ def wrap_signal_handler(sig):
         on_exit(signum, frame)
         if callable(old_handler):
             old_handler(signum, frame)
+        elif old_handler == signal.SIG_DFL:
+            # reset old signal handler to default handler
+            signal.signal(signal.SIGTERM, old_handler)
+            os.kill(os.getpid(), signum)  # retrigger signal to get default behavior
 
     signal.signal(sig, new_handler)
 
