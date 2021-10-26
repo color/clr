@@ -10,12 +10,25 @@ from clr.commands import resolve_command, get_namespace
 
 DEBUG_MODE = os.environ.get("CLR_DEBUG", "").lower() in ("true", "1")
 
+
 def on_exit(signum, frame):
     beeline.add_trace_field("killed_by_signal", signal.Signals(signum).name)
     beeline.close()
 
-signal.signal(signal.SIGINT, on_exit)
-signal.signal(signal.SIGTERM, on_exit)
+
+def wrap_signal_handler(sig):
+    old_handler = signal.getsignal(sig)
+
+    def new_handler(signum, frame):
+        on_exit(signum, frame)
+        old_handler(signum, frame)
+
+    signal.signal(sig, new_handler)
+
+
+wrap_signal_handler(signal.SIGINT)
+wrap_signal_handler(signal.SIGTERM)
+
 
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
