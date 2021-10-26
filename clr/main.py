@@ -10,12 +10,15 @@ from clr.commands import resolve_command, get_namespace
 
 DEBUG_MODE = os.environ.get("CLR_DEBUG", "").lower() in ("true", "1")
 
+
 def on_exit(signum, frame):
     beeline.add_trace_field("killed_by_signal", signal.Signals(signum).name)
     beeline.close()
 
+
 signal.signal(signal.SIGINT, on_exit)
 signal.signal(signal.SIGTERM, on_exit)
+
 
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
@@ -81,6 +84,8 @@ def main(argv=None):
                 )
                 if isinstance(result, (int, bool)):
                     exit_code = int(result)
+            except SystemExit as err:
+                exit_code = err.code
             except:
                 print(traceback.format_exc(), file=sys.stderr)
                 beeline.add_trace_field("raised_exception", True)
