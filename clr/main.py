@@ -30,6 +30,7 @@ wrap_signal_handler(signal.SIGINT)
 wrap_signal_handler(signal.SIGTERM)
 
 
+
 @contextmanager
 def init_beeline(namespace_key, cmd_name):
     try:
@@ -94,6 +95,8 @@ def main(argv=None):
                 )
                 if isinstance(result, (int, bool)):
                     exit_code = int(result)
+            except SystemExit as err:
+                exit_code = err.code
             except:
                 print(traceback.format_exc(), file=sys.stderr)
                 beeline.add_trace_field("raised_exception", True)
