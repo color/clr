@@ -21,14 +21,14 @@ def wrap_signal_handler(sig):
 
     def new_handler(signum, frame):
         on_exit(signum, frame)
-        old_handler(signum, frame)
+        if callable(old_handler):
+            old_handler(signum, frame)
 
     signal.signal(sig, new_handler)
 
 
 wrap_signal_handler(signal.SIGINT)
 wrap_signal_handler(signal.SIGTERM)
-
 
 
 @contextmanager
