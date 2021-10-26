@@ -16,8 +16,19 @@ def on_exit(signum, frame):
     beeline.close()
 
 
-signal.signal(signal.SIGINT, on_exit)
-signal.signal(signal.SIGTERM, on_exit)
+def wrap_signal_handler(sig):
+    old_handler = signal.getsignal(sig)
+
+    def new_handler(signum, frame):
+        on_exit(signum, frame)
+        old_handler(signum, frame)
+
+    signal.signal(sig, new_handler)
+
+
+wrap_signal_handler(signal.SIGINT)
+wrap_signal_handler(signal.SIGTERM)
+
 
 
 @contextmanager
