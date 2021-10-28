@@ -6,7 +6,8 @@ import time
 import traceback
 import atexit
 from contextlib import contextmanager
-from clr.commands import resolve_command, get_namespace
+from .commands import resolve_command, get_namespace
+from ._version import __version__
 
 DEBUG_MODE = os.environ.get("CLR_DEBUG", "").lower() in ("true", "1")
 
@@ -21,11 +22,13 @@ def send_to_honeycomb():
 
     Honeycomb logging is completely optional. If there are any failures
     simply continue as normal. This includes if clrenv can not be loaded.
+
+    These metrics are sent to honeycomb as an event rather than a trace for two
+    reasons:
+    1) They don't really fit the web requests model.
+    2) Downstream code might have its own tracing which we don't want to interfere
+    with.
     """
-
-    from importlib.metadata import version
-
-    print('!!clr!!', version('clr'))
     try:
         from clrenv import env
 
@@ -35,23 +38,21 @@ def send_to_honeycomb():
 
         beeline.init(
             writekey=env.honeycomb.writekey,
-            dataset="clrtest",
+            dataset="clr",
             service_name="clr",
-            debug=True,
         )
-        honeycomb_data["duration_ms"] = 1000 * (
-            time.time() - honeycomb_data["start_time"]
+
+        # Convert start_time into a duration.
+        honeycomb_data["duration_ms"] = int(
+            1000 * (time.time() - honeycomb_data["start_time"])
         )
         del honeycomb_data["start_time"]
-        honeycomb_data["username"] = getpass.getuser()
 
-        # honeycomb_data['query']
+        honeycomb_data["username"] = getpass.getuser()
+        honeycomb_data["clr_version"] = __version__
+        honeycomb_data["color_key_mode"] = env.key_mode
+
         beeline.send_now(honeycomb_data)
-        # print('@@@', honeycomb_data)
-        # with beeline.tracer("cmd"):
-        #     beeline.add(honeycomb_data)
-        #     # print('!!!', honeycomb_data)
-        #     time.sleep(1)
         beeline.close()
     except:
         if DEBUG_MODE:
@@ -59,6 +60,7 @@ def send_to_honeycomb():
             print(traceback.format_exc(), file=sys.stderr)
 
 
+# Will get run on normal completion, exceptions and sys.exit.
 atexit.register(send_to_honeycomb)
 
 
@@ -72,9 +74,9 @@ def main(argv=None):
     start_time = time.time()
     namespace_key, cmd_name = resolve_command(query)
 
-    honeycomb_data['start_time'] = start_time
-    honeycomb_data['namespace_key'] = namespace_key
-    honeycomb_data['cmd_name'] = cmd_name
+    honeycomb_data["start_time"] = start_time
+    honeycomb_data["namespace_key"] = namespace_key
+    honeycomb_data["cmd_name"] = cmd_name
 
     namespace = get_namespace(namespace_key)
 
@@ -82,6 +84,9 @@ def main(argv=None):
     exit_code = 0
 
     bound_args = namespace.parse_args(cmd_name, argv[2:])
+    # TODO(michael.cusack): Args are currently not logged to honeycomb for PHI reasons.
+    # Evaluate whether this is really an issue.
+    # honeycomb_data['args'] = bound_args.arguments
 
     # Some namespaces define a cmdinit function which should be run first.
     if hasattr(namespace.instance, "cmdinit"):

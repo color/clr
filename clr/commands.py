@@ -18,9 +18,9 @@ import argparse
 from itertools import takewhile
 import traceback
 
-import clr.config
+from .config import read_namespaces
 
-NAMESPACE_MODULE_PATHS = clr.config.read_namespaces()
+NAMESPACE_MODULE_PATHS = read_namespaces()
 # Sorted list of command namespace keys.
 NAMESPACE_KEYS = sorted({"system", *NAMESPACE_MODULE_PATHS.keys()})
 

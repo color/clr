@@ -1,2 +1,3 @@
 # This is the main entry point for the tool.
-from clr.main import main
+from .main import main
+from ._version import __version__

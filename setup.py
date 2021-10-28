@@ -1,10 +1,13 @@
 from setuptools import setup
+from pathlib import Path
+import re
 
 requirements = ["dataclasses;python_version<'3.7'", "honeycomb-beeline"]
 
+version = re.findall('__version__ = "(.+)"', Path("clr/_version.py").read_text())[0]
 setup(
     name="clr",
-    version="0.3.15",
+    version=version,
     description="A command line tool for executing custom python scripts.",
     author="Color",
     author_email="dev@getcolor.com",
