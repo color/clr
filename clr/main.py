@@ -71,12 +71,11 @@ def main(argv=None):
     if len(argv) > 1:
         query = argv[1]
 
-    start_time = time.time()
     namespace_key, cmd_name = resolve_command(query)
 
-    honeycomb_data["start_time"] = start_time
     honeycomb_data["namespace_key"] = namespace_key
     honeycomb_data["cmd_name"] = cmd_name
+    honeycomb_data["start_time"] = time.time()
 
     namespace = get_namespace(namespace_key)
 
