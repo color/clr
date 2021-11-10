@@ -116,6 +116,11 @@ def resolve_command(query, cache=None):
         sys.exit(1)
 
     namespace = cache.get(namespace_key) if cache else get_namespace(namespace_key)
+    if isinstance(namespace, ErrorLoadingNamespace):
+        print(f'Error loading {namespace_key} namespace module.\n')
+        print(namespace.longdescr)
+        sys.exit(1)
+
     if command_name not in namespace.commands:
         print(
             f"Error! Command '{command_name}' does not exist in namespace '{namespace_key}' - "
