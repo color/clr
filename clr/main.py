@@ -1,13 +1,16 @@
-import sys
-import os
+import atexit
 import getpass
-import beeline
+import os
+import sys
 import time
 import traceback
-import atexit
 from contextlib import contextmanager
-from .commands import resolve_command, get_namespace
+
+import beeline
+from clr_commands.util import set_admin_settings_and_database
+
 from ._version import __version__
+from .commands import get_namespace, resolve_command
 
 DEBUG_MODE = os.environ.get("CLR_DEBUG", "").lower() in ("true", "1")
 
@@ -64,12 +67,20 @@ def send_to_honeycomb():
 atexit.register(send_to_honeycomb)
 
 
+def potentially_set_admin_settings_and_database():
+    db = os.environ.get("CLR_PRE_SETTINGS_DB")
+    if db:
+        set_admin_settings_and_database(db)
+
+
 def main(argv=None):
     if not argv:
         argv = sys.argv
     query = "system:help"
     if len(argv) > 1:
         query = argv[1]
+
+    potentially_set_admin_settings_and_database()
 
     namespace_key, cmd_name = resolve_command(query)
 
