@@ -1,6 +1,6 @@
 # clr
 
-A command line tool for executing custom python scripts.
+A command line tool for executing custom python scripts. If you're using this tool to work on the main Color codebase, you'll probably install it via the `macos-m1-installer.sh` script as shown in the [Set Up Dev Env](https://getcolor.atlassian.net/wiki/spaces/SWEng/pages/2000355369/Set+up+development+environment#Build-development-environment) doc.
 
 ## Getting Started
 
