@@ -5,6 +5,9 @@ import re
 requirements = ["dataclasses;python_version<'3.7'", "honeycomb-beeline"]
 
 version = re.findall('__version__ = "(.+)"', Path("clr/_version.py").read_text())[0]
+install_requirements=Path("requirements.txt").read_text().splitlines()
+
+
 setup(
     name="clr",
     version=version,
@@ -16,9 +19,7 @@ setup(
     entry_points={
         "console_scripts": ["clr = clr:main"],
     },
-    install_requires=requirements,
-    setup_requires=["pytest-runner"],
-    tests_require=requirements + ["pytest==6.2.4"],
+    install_requires=install_requirements,
     license="MIT",
     include_package_data=True,
     package_data={
