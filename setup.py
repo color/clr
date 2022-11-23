@@ -17,7 +17,6 @@ setup(
         "console_scripts": ["clr = clr:main"],
     },
     install_requires=requirements,
-    setup_requires=["pytest-runner"],
     tests_require=requirements + ["pytest==6.2.4"],
     license="MIT",
     include_package_data=True,
