@@ -52,11 +52,11 @@ $ clr help namespace
 python3 -m venv <location>
 source <location>/bin/activate
 ```
-* Install this package as editable (symlinked to source files)
+* Install dependencies
 ```
-pip install -e .
+pip install -r requirements.txt -r test-requirements.txt
 ```
 * Run the tests
 ```
-python setup.py test
+PYTHONPATH=. pytest .
 ```
